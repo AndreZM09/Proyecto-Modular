@@ -1,0 +1,11 @@
+/* navbar.css */
+.navbar-custom {
+    background-color: #0056b3; /* Cambia el color de fondo de la barra de navegación */
+}
+
+.navbar-brand img {
+    width: 30px;
+    height: 30px;
+    /* Añadir un margen opcional si es necesario */
+    margin-right: 10px;
+}
