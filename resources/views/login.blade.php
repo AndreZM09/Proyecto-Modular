@@ -3,39 +3,53 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login</title>
+    <title>Campañas de Marketing</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="{{ asset('css/navbar.css') }}" rel="stylesheet" /> <!-- Incluimos el CSS de la barra de navegación -->
-    <link href="{{ asset('css/login.css') }}" rel="stylesheet" />
+    <link href="{{ asset('css/navbar.css') }}" rel="stylesheet" /> <!-- Navbar CSS -->
+    <link href="{{ asset('css/login.css') }}" rel="stylesheet" /> <!-- Login CSS -->
+    <style>
+        /* Fondo dinámico desde PHP */
+        body.login-page {
+            margin: 0;
+            padding: 0;
+            background: url('{{ asset("imagenes/fondo.png") }}') no-repeat center center fixed;
+            background-size: cover;
+            background-position: center 70px; /* Mueve la imagen 70px hacia abajo */
+            font-family: sans-serif;
+            height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+    </style>
 </head>
-<body>
 
-    <!-- Incluir la Barra de Navegación -->
+<body class="login-page"> <!-- Clase agregada -->
+
+    <!-- ✅ Barra de Navegación fuera del body -->
     @include('layouts.navbar')
 
-    <div class="container mt-5">
-        <div class="row justify-content-center">
-            <div class="col-md-6">
-                <div class="card">
-                    <div class="card-header">
-                        <h4 class="text-center">Login</h4>
-                    </div>
-                    <div class="card-body">
-                        <form action="{{ route('login.submit') }}" method="POST">
-                            @csrf
-                            <div class="mb-3">
-                                <label for="email" class="form-label">Correo electrónico</label>
-                                <input type="email" class="form-control" id="email" name="email" required />
-                            </div>
-                            <div class="mb-3">
-                                <label for="password" class="form-label">Contraseña</label>
-                                <input type="password" class="form-control" id="password" name="password" required />
-                            </div>
-                            <button type="submit" class="btn btn-primary w-100">Iniciar sesión</button>
-                        </form>
-                    </div>
-                </div>
+    <!-- ✅ Contenedor del Login -->
+    <div class="container d-flex justify-content-center align-items-center vh-100">
+        <div class="login-box">
+            <!-- Logo con fondo blanco circular -->
+            <div class="logo-container">
+                <img src="{{ asset('imagenes/logo.png') }}" class="avatar" alt="Avatar Image">
             </div>
+            <h1>Campañas de Marketing</h1>
+            <form action="{{ route('login.submit') }}" method="POST">
+                @csrf
+                <label for="email">Correo electrónico</label>
+                <input type="email" name="email" placeholder="Ingresa tu correo" required>
+
+                <label for="password">Contraseña</label>
+                <input type="password" name="password" placeholder="Ingresa tu contraseña" required>
+
+                <input type="submit" value="Iniciar Sesión">
+
+                <a href="#">¿Olvidaste tu contraseña?</a><br>
+                <a href="#">¿No tienes una cuenta?</a>
+            </form>
         </div>
     </div>
 

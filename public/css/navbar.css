@@ -1,11 +1,30 @@
 /* navbar.css */
+
+/* Fondo personalizado de la barra */
 .navbar-custom {
-    background-color: #0056b3; /* Cambia el color de fondo de la barra de navegación */
+    background-color: #f5f6f6;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+    position: fixed;
+    top: 0;
+    width: 100%;
+    z-index: 1000;
 }
 
+/* Centrar el texto con el logo */
+.navbar-brand {
+    display: flex;
+    align-items: center;
+}
+
+/* Tamaño del logo */
 .navbar-brand img {
-    width: 30px;
-    height: 30px;
-    /* Añadir un margen opcional si es necesario */
+    width: 60px;
+    height: 60px;
     margin-right: 10px;
+}
+
+/* ✅ Aplica padding solo si NO es la página de login */
+body:not(.login-page) {
+    padding-top: 70px;
 }
