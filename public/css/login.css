@@ -2,19 +2,29 @@
 
 /* ✅ Elimina el padding en la página de login */
 body.login-page {
-  padding-top: 0;
+  margin: 0;
+  padding: 0;
+  background: url('../imagenes/fondo.png') no-repeat center 70px fixed; /* Imagen de fondo, movida 70px hacia abajo */
+  background-size: cover; /* Cubrir toda la pantalla */
+  font-family: sans-serif;
+  height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
 }
 
 /* Caja del login */
 .login-box {
-  width: 100%;
-  max-width: 320px;
+  width: 90%; /* Ajuste para dispositivos móviles */
+  max-width: 400px; /* Aumentamos el ancho máximo para pantallas más grandes */
   background: rgba(0, 0, 0, 0.7);
   color: #fff;
   border-radius: 10px;
-  padding: 70px 30px;
+  padding: 70px 20px; /* Ajuste de padding para dispositivos móviles */
   box-sizing: border-box;
   position: relative;
+  margin: 20px; /* Margen para evitar que toque los bordes en móviles */
+  margin-top: 150px; /* Aumentamos el margen superior para evitar que toque el navbar */
 }
 
 /* Contenedor del logo con fondo blanco circular */
@@ -42,7 +52,7 @@ body.login-page {
 /* Título */
 .login-box h1 {
   margin: 0;
-  padding: 0 0 20px;
+  padding: 60px 0 20px; /* Añadimos padding superior para evitar que el logo tape el texto */
   text-align: center;
   font-size: 22px;
 }
@@ -66,22 +76,25 @@ body.login-page {
   margin-bottom: 20px;
 }
 
-/* Botón de enviar */
-.login-box input[type="submit"] {
-  width: 100%;
+.login-box button[type="submit"] {
+  width: 100%; /* Asegura el ancho completo */
   border: none;
   height: 40px;
-  background: #b80f22;
+  background: #b80f22; /* Color principal */
   color: #fff;
   font-size: 18px;
   border-radius: 20px;
   cursor: pointer;
+  transition: background 0.3s ease, transform 0.2s ease;
+  margin-top: 15px;
 }
 
-.login-box input[type="submit"]:hover {
+.login-box button[type="submit"]:hover {
   background: #ffc107;
   color: #000;
+  transform: scale(1.05);
 }
+
 
 /* Enlaces */
 .login-box a {
@@ -92,4 +105,63 @@ body.login-page {
 
 .login-box a:hover {
   color: #fff;
+}
+
+/* Estilos para los mensajes de éxito/error */
+#message {
+  margin-bottom: 15px; /* Añadir margen inferior */
+  display: none; /* Ocultar por defecto */
+}
+
+/* Estilos adicionales para el mensaje de error */
+#message.alert-danger {
+  color: #721c24; /* Color del texto */
+  background-color: #f8d7da; /* Color de fondo */
+  border-color: #f5c6cb; /* Color del borde */
+  padding: 10px; /* Espaciado interno */
+  border-radius: 5px; /* Bordes redondeados */
+}
+
+/* Estilos adicionales para el mensaje de éxito */
+#message.alert-success {
+  color: #155724; /* Color del texto */
+  background-color: #d4edda; /* Color de fondo */
+  border-color: #c3e6cb; /* Color del borde */
+  padding: 10px; /* Espaciado interno */
+  border-radius: 5px; /* Bordes redondeados */
+}
+
+/* Media queries para ajustes responsivos */
+@media (max-width: 768px) {
+  .login-box {
+    padding: 50px 15px; /* Reducir padding en dispositivos móviles */
+    margin-top: 120px; /* Ajustar margen superior en móviles */
+  }
+
+  .login-box h1 {
+    font-size: 20px; /* Reducir tamaño del título en móviles */
+    padding: 50px 0 20px; /* Ajustar padding superior en móviles */
+  }
+
+  .login-box input[type="email"],
+  .login-box input[type="password"] {
+    font-size: 14px; /* Reducir tamaño de fuente en móviles */
+  }
+
+  .login-box input[type="submit"] {
+    font-size: 16px; /* Reducir tamaño de fuente en móviles */
+  }
+
+  /* Ajustar el logo en móviles */
+  .logo-container {
+    width: 100px; /* Reducir tamaño del contenedor en móviles */
+    height: 100px; /* Reducir tamaño del contenedor en móviles */
+    top: -50px; /* Ajustar posición en móviles */
+    left: calc(50% - 50px); /* Ajustar posición en móviles */
+  }
+
+  .logo-container .avatar {
+    width: 60px; /* Reducir tamaño del logo en móviles */
+    height: 60px; /* Reducir tamaño del logo en móviles */
+  }
 }
