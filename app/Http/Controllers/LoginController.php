@@ -32,6 +32,7 @@ class LoginController extends Controller
             return response()->json([
                 'success' => true,
                 'message' => 'Inicio de sesión exitoso.',
+                'redirect' => route('estadisticas'), // URL de redirección
             ]);
         } else {
             // Credenciales incorrectas

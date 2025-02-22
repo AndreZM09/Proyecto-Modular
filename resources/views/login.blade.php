@@ -57,10 +57,10 @@
             // Manejar el envío del formulario
             $('#loginForm').on('submit', function (e) {
                 e.preventDefault(); // Evitar que el formulario se envíe de manera tradicional
-
+    
                 // Obtener los datos del formulario
                 var formData = $(this).serialize();
-
+    
                 // Enviar los datos con AJAX
                 $.ajax({
                     url: '{{ route("login.submit") }}', // Ruta a la que se enviarán los datos
@@ -71,7 +71,8 @@
                             // Mostrar mensaje de éxito
                             $('#message').removeClass('alert-danger').addClass('alert-success').text(response.message).fadeIn();
                             setTimeout(function () {
-                                window.location.href = '{{ route("dashboard") }}'; // Redirigir al dashboard
+                                // Redirigir a la URL proporcionada por el servidor
+                                window.location.href = response.redirect;
                             }, 2000); // Redirigir después de 2 segundos
                         } else {
                             // Mostrar mensaje de error

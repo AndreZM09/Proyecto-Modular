@@ -9,7 +9,7 @@ Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 // Ruta para procesar el login
 Route::post('/login', [LoginController::class, 'login'])->name('login.submit');
 
-// Ruta del dashboard (protegida)
-Route::get('/dashboard', function () {
-    return view('dashboard'); // Asegúrate de que esta vista exista
-})->name('dashboard')->middleware('auth'); // Protege esta ruta con autenticación
+// Ruta de estadísticas
+Route::get('/estadisticas', function () {
+    return view('estadisticas'); // Asegúrate de que esta vista exista
+})->name('estadisticas')->middleware('auth'); // Protege esta ruta con autenticación
