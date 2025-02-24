@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Redirect;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
+use App\Http\Controllers\EstadisticasController;
 
 // Ruta para mostrar el formulario de login
 Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
@@ -12,9 +13,9 @@ Route::get('/', [LoginController::class, 'showLoginForm'])->name('login');
 Route::post('/login', [LoginController::class, 'login'])->name('login.submit');
 
 // Ruta de estadísticas, protegida por el middleware 'auth'
-Route::get('/estadisticas', function () {
-    return view('estadisticas'); // Crea la vista resources/views/estadisticas.blade.php
-})->name('estadisticas')->middleware('auth');
+
+Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('estadisticas');
+
 
 Route::get('/track-click', function (Request $request) {
     // Registrar el clic en la base de datos
