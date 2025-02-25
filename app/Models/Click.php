@@ -9,7 +9,7 @@ class Click extends Model
 {
     use HasFactory;
 
-    protected $table = 'clicks'; // Nombre de la tabla en la BD
+    protected $table = 'clicks';
 
-    protected $fillable = ['id', 'email', 'created_at']; // Campos que se pueden asignar masivamente
+    protected $fillable = ['id', 'email', 'ip_address', 'created_at'];
 }
