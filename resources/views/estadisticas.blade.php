@@ -11,112 +11,207 @@
 </head>
 
 <body class="estadisticas-page">
-
     @include('layouts.navbar')
 
     <div class="container mt-4">
-        <h1>Estadísticas</h1>
-        <p>Total de registros en la tabla <strong>clicks</strong>: <span class="badge bg-primary">{{ $clicksCount }}</span></p>
+        <h1 class="text-center">📊 Estadísticas</h1>
+        <p class="text-center">Total de registros en la tabla <strong>clicks</strong>: <span class="badge bg-primary">{{ $clicksCount }}</span></p>
 
-        <!-- 📊 Gráfica Circular: Emails Abiertos vs No Abiertos -->
-        <div class="chart-container">
-            <h3>Emails Abiertos vs No Abiertos</h3>
-            <canvas id="openedChart"></canvas>
+        <div class="row">
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h3>Emails Abiertos vs No Abiertos</h3>
+                    <div class="chart-wrapper double-value">
+                        <canvas id="openedChart"></canvas>
+                        <div class="chart-center-text">
+                            <span class="chart-center-main">{{ $opened }}</span>
+                            <span class="chart-center-label">Abiertos</span>
+                            <span class="chart-center-secondary">{{ $notOpened }}</span>
+                            <span class="chart-center-label">No Abiertos</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-6">
+                <div class="chart-container">
+                    <h3>Clics por Municipio</h3>
+                    <div class="chart-wrapper municipio-chart">
+                        <canvas id="municipioChart"></canvas>
+                        <div class="chart-center-text">
+                            <span class="chart-center-main">{{ $totalClicsMunicipios }}</span>
+                            <span class="chart-center-label">Total</span>
+                        </div>
+                    </div>
+                    <div class="municipio-legend">
+                        @foreach($clicksByMunicipio as $municipio)
+                        <div class="legend-item">
+                            <span class="legend-color" style="background-color: {{ $municipioColors[$municipio->municipio] }}"></span>
+                            <span class="legend-label">{{ $municipio->municipio }}: {{ $municipio->total }}</span>
+                        </div>
+                        @endforeach
+                    </div>
+                </div>
+            </div>
         </div>
 
-        <!-- 📊 Gráfica de Barras: Clics por Zona (IP) -->
-        <div class="chart-container">
-            <h3>Clics por Zona (IP)</h3>
-            <canvas id="zoneChart"></canvas>
-        </div>
-
-        <!-- 📊 Gráfica de Barras: Personas que hicieron clic -->
-        <div class="chart-container">
-            <h3>Personas que hicieron clic</h3>
-            <canvas id="clickedChart"></canvas>
-        </div>
-
-        <!-- 📊 Gráfica de Barras: Personas que no hicieron clic -->
-        <div class="chart-container">
-            <h3>Personas que no hicieron clic</h3>
-            <canvas id="notClickedChart"></canvas>
-        </div>
-
-        <!-- 📊 Gráfica de Barras: Personas que recibieron el mail -->
-        <div class="chart-container">
-            <h3>Personas que recibieron el mail</h3>
-            <canvas id="receivedChart"></canvas>
+        <div class="row mt-4">
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h3>Personas que hicieron clic</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="clickedChart"></canvas>
+                        <div class="chart-center-text">
+                            <span class="chart-center-main">{{ $clicksCount }}</span>
+                            <span class="chart-center-label">Personas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h3>Personas que no hicieron clic</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="notClickedChart"></canvas>
+                        <div class="chart-center-text">
+                            <span class="chart-center-main">{{ $totalEmails - $clicksCount }}</span>
+                            <span class="chart-center-label">Personas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="col-md-4">
+                <div class="chart-container">
+                    <h3>Personas que recibieron el mail</h3>
+                    <div class="chart-wrapper">
+                        <canvas id="receivedChart"></canvas>
+                        <div class="chart-center-text">
+                            <span class="chart-center-main">{{ $totalEmails }}</span>
+                            <span class="chart-center-label">Personas</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
     <script>
-        // 📊 Gráfica Circular
+        // Configuración común para todas las gráficas
+        const commonChartOptions = {
+            cutout: '75%',
+            plugins: {
+                legend: {
+                    display: false
+                }
+            },
+            layout: {
+                padding: {
+                    top: 20,
+                    bottom: 20
+                }
+            }
+        };
+
+        // Gráfica de emails abiertos (mostrando ambos valores)
         const openedCtx = document.getElementById('openedChart').getContext('2d');
         new Chart(openedCtx, {
-            type: 'pie',
+            type: 'doughnut',
             data: {
                 labels: ['Abiertos', 'No Abiertos'],
                 datasets: [{
                     data: [{{ $opened }}, {{ $notOpened }}],
-                    backgroundColor: ['#28a745', '#dc3545']
+                    backgroundColor: ['#28a745', '#dc3545'],
+                    borderWidth: 0
                 }]
+            },
+            options: {
+                ...commonChartOptions,
+                plugins: {
+                    tooltip: {
+                        enabled: true
+                    }
+                }
             }
         });
 
-        // 📊 Gráfica de Barras por IP
-        const zoneCtx = document.getElementById('zoneChart').getContext('2d');
-        new Chart(zoneCtx, {
-            type: 'bar',
+        // Gráfica de clics por municipio
+        const municipioCtx = document.getElementById('municipioChart').getContext('2d');
+        new Chart(municipioCtx, {
+            type: 'doughnut',
             data: {
-                labels: {!! json_encode($clicksByZone->pluck('ip_address')) !!},
+                labels: {!! json_encode($clicksByMunicipio->pluck('municipio')) !!},
                 datasets: [{
-                    label: 'Clics por IP',
-                    data: {!! json_encode($clicksByZone->pluck('total')) !!},
-                    backgroundColor: '#007bff'
+                    data: {!! json_encode($clicksByMunicipio->pluck('total')) !!},
+                    backgroundColor: {!! json_encode(array_values($municipioColors)) !!},
+                    borderWidth: 0
                 }]
+            },
+            options: {
+                ...commonChartOptions,
+                cutout: '65%',
+                plugins: {
+                    tooltip: {
+                        callbacks: {
+                            label: function(context) {
+                                return `${context.label}: ${context.raw} clics`;
+                            }
+                        }
+                    }
+                }
             }
         });
 
-        // 📊 Gráfica de Barras: Personas que hicieron clic
+        // Configuración para gráficas de medidores (180 grados)
+        const gaugeOptions = {
+            ...commonChartOptions,
+            rotation: -90,
+            circumference: 180,
+            plugins: {
+                tooltip: {
+                    enabled: false
+                }
+            }
+        };
+
+        // Gráfica de personas que hicieron clic
         const clickedCtx = document.getElementById('clickedChart').getContext('2d');
-        new Chart(clickedCtx, {
-            type: 'bar',
+        const clickedChart = new Chart(clickedCtx, {
+            type: 'doughnut',
             data: {
-                labels: ['Personas que hicieron clic'],
                 datasets: [{
-                    label: 'Clics',
-                    data: [{{ $clicksCount }}],
-                    backgroundColor: '#28a745'
+                    data: [{{ $clicksCount }}, {{ $clicksCount * 0.3 }}],
+                    backgroundColor: ['#28a745', '#f0f0f0'],
+                    borderWidth: 0
                 }]
-            }
+            },
+            options: gaugeOptions
         });
 
-        // 📊 Gráfica de Barras: Personas que no hicieron clic
+        // Gráfica de personas que no hicieron clic
         const notClickedCtx = document.getElementById('notClickedChart').getContext('2d');
-        new Chart(notClickedCtx, {
-            type: 'bar',
+        const notClickedChart = new Chart(notClickedCtx, {
+            type: 'doughnut',
             data: {
-                labels: ['Personas que no hicieron clic'],
                 datasets: [{
-                    label: 'No Clics',
-                    data: [{{ $totalEmails - $clicksCount }}],
-                    backgroundColor: '#dc3545'
+                    data: [{{ $totalEmails - $clicksCount }}, {{ ($totalEmails - $clicksCount) * 0.3 }}],
+                    backgroundColor: ['#dc3545', '#f0f0f0'],
+                    borderWidth: 0
                 }]
-            }
+            },
+            options: gaugeOptions
         });
 
-        // 📊 Gráfica de Barras: Personas que recibieron el mail
+        // Gráfica de personas que recibieron el mail
         const receivedCtx = document.getElementById('receivedChart').getContext('2d');
-        new Chart(receivedCtx, {
-            type: 'bar',
+        const receivedChart = new Chart(receivedCtx, {
+            type: 'doughnut',
             data: {
-                labels: ['Personas que recibieron el mail'],
                 datasets: [{
-                    label: 'Recibidos',
-                    data: [{{ $totalEmails }}],
-                    backgroundColor: '#ffc107'
+                    data: [{{ $totalEmails }}, {{ $totalEmails * 0.3 }}],
+                    backgroundColor: ['#ffc107', '#f0f0f0'],
+                    borderWidth: 0
                 }]
-            }
+            },
+            options: gaugeOptions
         });
     </script>
 

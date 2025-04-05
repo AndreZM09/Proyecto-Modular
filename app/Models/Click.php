@@ -11,5 +11,14 @@ class Click extends Model
 
     protected $table = 'clicks';
 
-    protected $fillable = ['id', 'email', 'ip_address', 'created_at'];
+    protected $fillable = [
+        'email', 
+        'ip_address',
+        'municipio',
+        'created_at'
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime'
+    ];
 }

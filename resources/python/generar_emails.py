@@ -3,7 +3,7 @@ import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
-from dotenv import load_dotenv  # <-- Cargar el .env
+from dotenv import load_dotenv
 
 # Cargar variables de entorno
 load_dotenv()
@@ -58,15 +58,17 @@ if __name__ == '__main__':
     <html>
       <body>
         <p>Haz clic en la imagen para registrar el clic:</p>
-        <a href="{base_url}/track-click?email={sender}">
+        <a href="{base_url}/track-click?email={recipient}">
           <img src="cid:image1" alt="Imagen de ejemplo" style="width:300px;">
         </a>
+        <!-- Pixel de seguimiento invisible para registrar apertura -->
+        <img src="{base_url}/track-open?email={recipient}" width="1" height="1" style="display:none;">
       </body>
     </html>
     '''
     
     # Cargar la ruta de la imagen desde el .env
-    image_path = os.getenv('EMAIL_IMAGE_PATH',)
+    image_path = os.getenv('EMAIL_IMAGE_PATH')
     image_cid = 'image1'
 
     send_email_with_image(sender, password, recipient, subject, html_content, image_path, image_cid)
