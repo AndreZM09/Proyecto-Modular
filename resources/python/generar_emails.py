@@ -1,5 +1,6 @@
 import os
 import smtplib
+import mysql.connector
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
@@ -8,8 +9,34 @@ from dotenv import load_dotenv
 # Cargar variables de entorno
 load_dotenv()
 
+def get_latest_image():
+    try:
+        connection = mysql.connector.connect(
+            host=os.getenv('DB_HOST', 'localhost'),
+            user=os.getenv('DB_USERNAME', 'root'),
+            password=os.getenv('DB_PASSWORD', ''),
+            database=os.getenv('DB_DATABASE', 'modular')
+        )
+        
+        cursor = connection.cursor(dictionary=True)
+        cursor.execute("SELECT filename FROM email_images ORDER BY created_at DESC LIMIT 1")
+        result = cursor.fetchone()
+        
+        if result:
+            image_path = os.path.join('storage', 'app', 'public', 'email_images', result['filename'])
+            return image_path
+        return None
+        
+    except Exception as e:
+        print("Error al obtener la imagen de la base de datos:", e)
+        return None
+    finally:
+        if 'connection' in locals() and connection.is_connected():
+            cursor.close()
+            connection.close()
+
 def send_email_with_image(sender, password, recipient, subject,
-                          html_content, image_path, image_cid,
+                          html_content, image_cid,
                           smtp_server='smtp.gmail.com', port=587):
     msg = MIMEMultipart('related')
     msg['From'] = sender
@@ -25,14 +52,21 @@ def send_email_with_image(sender, password, recipient, subject,
     html_part = MIMEText(html_content, 'html')
     msg_alternative.attach(html_part)
 
-    try:
-        with open(image_path, 'rb') as img_file:
-            img = MIMEImage(img_file.read())
-            img.add_header('Content-ID', f'<{image_cid}>')
-            img.add_header('Content-Disposition', 'inline', filename=image_path)
-            msg.attach(img)
-    except Exception as e:
-        print("Error al adjuntar la imagen:", e)
+    # Obtener la última imagen subida
+    image_path = get_latest_image()
+    
+    if image_path and os.path.exists(image_path):
+        try:
+            with open(image_path, 'rb') as img_file:
+                img = MIMEImage(img_file.read())
+                img.add_header('Content-ID', f'<{image_cid}>')
+                img.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_path))
+                msg.attach(img)
+        except Exception as e:
+            print("Error al adjuntar la imagen:", e)
+            return
+    else:
+        print("No se encontró una imagen configurada")
         return
 
     try:
@@ -67,8 +101,6 @@ if __name__ == '__main__':
     </html>
     '''
     
-    # Cargar la ruta de la imagen desde el .env
-    image_path = os.getenv('EMAIL_IMAGE_PATH')
     image_cid = 'image1'
 
-    send_email_with_image(sender, password, recipient, subject, html_content, image_path, image_cid)
+    send_email_with_image(sender, password, recipient, subject, html_content, image_cid)

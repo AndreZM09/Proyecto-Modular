@@ -4,7 +4,9 @@ namespace App\Http\Controllers;
 
 use Illuminate\Http\Request;
 use App\Models\Click;
+use App\Models\EmailImage;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 use Stevebauman\Location\Facades\Location;
 
 class EstadisticasController extends Controller
@@ -31,6 +33,9 @@ class EstadisticasController extends Controller
             $municipioColors[$municipio->municipio] = $this->getMunicipioColor($municipio->municipio);
         }
 
+        // Obtener la última imagen subida
+        $currentImage = EmailImage::latest()->first();
+
         return view('estadisticas', compact(
             'clicksCount',
             'opened',
@@ -38,8 +43,60 @@ class EstadisticasController extends Controller
             'totalEmails',
             'clicksByMunicipio',
             'totalClicsMunicipios',
-            'municipioColors'
+            'municipioColors',
+            'currentImage'
         ));
+    }
+
+    public function uploadImage(Request $request)
+    {
+        $request->validate([
+            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048'
+        ]);
+
+        try {
+            if ($request->hasFile('image')) {
+                $file = $request->file('image');
+                $filename = time() . '_' . $file->getClientOriginalName();
+                
+                // Guardar la imagen en el almacenamiento
+                $path = $file->storeAs('email_images', $filename, 'public');
+                
+                // Crear registro en la base de datos
+                EmailImage::create([
+                    'filename' => $filename,
+                    'original_name' => $file->getClientOriginalName(),
+                    'mime_type' => $file->getMimeType(),
+                    'size' => $file->getSize()
+                ]);
+
+                return response()->json([
+                    'success' => true,
+                    'message' => 'Imagen subida exitosamente',
+                    'filename' => $filename
+                ]);
+            }
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al subir la imagen: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getCurrentImage()
+    {
+        $image = EmailImage::latest()->first();
+        if ($image) {
+            return response()->json([
+                'success' => true,
+                'filename' => $image->filename
+            ]);
+        }
+        return response()->json([
+            'success' => false,
+            'message' => 'No hay imagen configurada'
+        ]);
     }
 
     public function trackClick(Request $request)

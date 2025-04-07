@@ -3,6 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="csrf-token" content="{{ csrf_token() }}">
     <title>Estadísticas</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
     <link href="{{ asset('css/navbar.css') }}" rel="stylesheet" />
@@ -15,6 +16,41 @@
 
     <div class="container mt-4">
         <h1 class="text-center">📊 Estadísticas</h1>
+        
+        <!-- Sección de configuración de imagen -->
+        <div class="card mb-4">
+            <div class="card-header">
+                <h5 class="mb-0">Configuración de Imagen para Correos</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <div class="col-md-6">
+                        <form id="imageUploadForm" action="{{ route('estadisticas.upload-image') }}" method="POST" enctype="multipart/form-data">
+                            @csrf
+                            <div class="mb-3">
+                                <label for="image" class="form-label">Seleccionar Imagen</label>
+                                <input type="file" class="form-control" id="image" name="image" accept="image/*" required>
+                            </div>
+                            <button type="submit" class="btn btn-primary">Subir Imagen</button>
+                        </form>
+                    </div>
+                    <div class="col-md-6">
+                        <div id="currentImageContainer">
+                            @if($currentImage)
+                                <h6>Imagen Actual:</h6>
+                                <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}" 
+                                     alt="Imagen actual" 
+                                     class="img-thumbnail" 
+                                     style="max-height: 200px;">
+                            @else
+                                <p class="text-muted">No hay imagen configurada</p>
+                            @endif
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
         <p class="text-center">Total de registros en la tabla <strong>clicks</strong>: <span class="badge bg-primary">{{ $clicksCount }}</span></p>
 
         <div class="row">
@@ -213,8 +249,43 @@
             },
             options: gaugeOptions
         });
+
+        // Añadir código para manejar la subida de imágenes
+        document.getElementById('imageUploadForm').addEventListener('submit', function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            
+            fetch(this.action, {
+                method: 'POST',
+                body: formData,
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    alert('Imagen subida exitosamente');
+                    location.reload();
+                } else {
+                    alert('Error al subir la imagen: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al subir la imagen: ' + error.message);
+            });
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
+</html>
 </html>
