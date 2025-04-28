@@ -82,7 +82,8 @@ def send_email_with_image(sender, password, recipient, subject,
 if __name__ == '__main__':
     sender = os.getenv('EMAIL_SENDER')  
     password = os.getenv('EMAIL_PASSWORD')
-    recipient = os.getenv('EMAIL_RECIPIENT')
+    # Lista de destinatarios
+    recipients = ['andre_zm09@hotmail.com', 'andre.zurita2865@alumnos.udg.mx']
     subject = 'Prueba de envío de email'
 
     # Usamos la URL base desde el .env
@@ -92,15 +93,18 @@ if __name__ == '__main__':
     <html>
       <body>
         <p>Haz clic en la imagen para registrar el clic:</p>
-        <a href="{base_url}/track-click?email={recipient}">
+        <a href="{base_url}/track-click?email={recipients[0]}">
           <img src="cid:image1" alt="Imagen de ejemplo" style="width:300px;">
         </a>
         <!-- Pixel de seguimiento invisible para registrar apertura -->
-        <img src="{base_url}/track-open?email={recipient}" width="1" height="1" style="display:none;">
+        <img src="{base_url}/track-open?email={recipients[0]}" width="1" height="1" style="display:none;">
       </body>
     </html>
     '''
     
     image_cid = 'image1'
 
-    send_email_with_image(sender, password, recipient, subject, html_content, image_cid)
+    # Enviar el correo a cada destinatario
+    for recipient in recipients:
+        print(f"Enviando correo a: {recipient}")
+        send_email_with_image(sender, password, recipient, subject, html_content, image_cid)

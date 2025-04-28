@@ -19,6 +19,8 @@ Route::get('/estadisticas', [EstadisticasController::class, 'index'])->name('est
 Route::post('/estadisticas/upload-image', [EstadisticasController::class, 'uploadImage'])->name('estadisticas.upload-image');
 Route::get('/estadisticas/current-image', [EstadisticasController::class, 'getCurrentImage'])->name('estadisticas.current-image');
 
+Route::post('/estadisticas/send-test-email', [EstadisticasController::class, 'sendTestEmail'])->name('estadisticas.send-test-email');
+
 Route::get('/track-click', function (Request $request) {
     // Registrar el clic en la base de datos
     DB::table('clicks')->insert([

@@ -9,6 +9,8 @@
     <link href="{{ asset('css/navbar.css') }}" rel="stylesheet" />
     <link href="{{ asset('css/estadisticas.css') }}" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <!-- Añadir Bootstrap Icons -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/bootstrap-icons@1.11.3/font/bootstrap-icons.min.css">
 </head>
 
 <body class="estadisticas-page">
@@ -42,6 +44,17 @@
                                      alt="Imagen actual" 
                                      class="img-thumbnail" 
                                      style="max-height: 200px;">
+                                <div class="mt-2">
+                                    <button id="sendTestEmail" class="btn btn-success">
+                                        <i class="bi bi-envelope"></i> Enviar Correo
+                                    </button>
+                                    <div id="emailStatus" class="mt-2" style="display: none;">
+                                        <div class="spinner-border spinner-border-sm text-primary" role="status">
+                                            <span class="visually-hidden">Enviando...</span>
+                                        </div>
+                                        <span class="ms-2">Enviando correos...</span>
+                                    </div>
+                                </div>
                             @else
                                 <p class="text-muted">No hay imagen configurada</p>
                             @endif
@@ -283,9 +296,50 @@
                 alert('Error al subir la imagen: ' + error.message);
             });
         });
+
+        // Añadir código para enviar el correo de prueba
+        document.getElementById('sendTestEmail')?.addEventListener('click', function() {
+            const button = this;
+            const statusDiv = document.getElementById('emailStatus');
+            
+            // Deshabilitar el botón y mostrar el indicador de carga
+            button.disabled = true;
+            statusDiv.style.display = 'block';
+            
+            const csrfToken = document.querySelector('meta[name="csrf-token"]').getAttribute('content');
+            
+            fetch('{{ route("estadisticas.send-test-email") }}', {
+                method: 'POST',
+                headers: {
+                    'X-CSRF-TOKEN': csrfToken,
+                    'Content-Type': 'application/json'
+                }
+            })
+            .then(response => {
+                if (!response.ok) {
+                    throw new Error('Error en la respuesta del servidor');
+                }
+                return response.json();
+            })
+            .then(data => {
+                if (data.success) {
+                    alert('Correo de prueba enviado exitosamente');
+                } else {
+                    alert('Error al enviar el correo de prueba: ' + data.message);
+                }
+            })
+            .catch(error => {
+                console.error('Error:', error);
+                alert('Error al enviar el correo de prueba: ' + error.message);
+            })
+            .finally(() => {
+                // Rehabilitar el botón y ocultar el indicador de carga
+                button.disabled = false;
+                statusDiv.style.display = 'none';
+            });
+        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
-</html>
 </html>

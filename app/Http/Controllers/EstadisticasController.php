@@ -8,6 +8,7 @@ use App\Models\EmailImage;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Stevebauman\Location\Facades\Location;
+use Illuminate\Support\Facades\Log;
 
 class EstadisticasController extends Controller
 {
@@ -152,5 +153,60 @@ class EstadisticasController extends Controller
         ];
 
         return $colors[$municipio] ?? $colors['Desconocido'];
+    }
+
+    public function sendTestEmail(Request $request)
+    {
+        try {
+            // Obtener el email del destinatario desde el .env
+            $recipient = env('EMAIL_RECIPIENT');
+            
+            if (!$recipient) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se ha configurado un email de destinatario'
+                ], 400);
+            }
+
+            // Cambiar al directorio del proyecto
+            $projectPath = base_path();
+            chdir($projectPath);
+
+            // Ejecutar el script de Python con la ruta completa
+            $command = 'python ' . $projectPath . '/resources/python/generar_emails.py 2>&1';
+            exec($command, $output, $return_var);
+
+            // Registrar la salida para depuración
+            Log::info('Salida del comando Python:', [
+                'output' => $output,
+                'return_var' => $return_var,
+                'command' => $command
+            ]);
+
+            if ($return_var !== 0) {
+                Log::error('Error al enviar el correo de prueba', [
+                    'output' => $output,
+                    'return_var' => $return_var
+                ]);
+                
+                return response()->json([
+                    'success' => false,
+                    'message' => 'Error al enviar el correo de prueba: ' . implode("\n", $output)
+                ], 500);
+            }
+
+            return response()->json([
+                'success' => true,
+                'message' => 'Correo de prueba enviado exitosamente'
+            ]);
+
+        } catch (\Exception $e) {
+            Log::error('Error al enviar el correo de prueba: ' . $e->getMessage());
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al enviar el correo de prueba: ' . $e->getMessage()
+            ], 500);
+        }
     }
 }
