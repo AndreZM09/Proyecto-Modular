@@ -28,3 +28,26 @@
 body:not(.login-page) {
     padding-top: 70px;
 }
+
+/* Navbar Custom Styles */
+body, html {
+    margin: 0;
+    padding: 0;
+}
+
+.navbar {
+    margin: 0 !important;
+    border-radius: 0;
+    padding: 0.5rem 1rem;
+}
+
+/* Reset margins for the first element after navbar */
+.navbar + * {
+    margin-top: 0 !important;
+}
+
+/* Active link styles */
+.navbar .nav-link.active {
+    color: #0056b3 !important;
+    font-weight: bold;
+}
