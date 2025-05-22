@@ -7,11 +7,13 @@ use Illuminate\Support\Facades\Auth;
 
 class LoginController extends Controller
 {
+    // Muestra el formulario de login
     public function showLoginForm()
     {
         return view('login');
     }
 
+    // Procesa el intento de login
     public function login(Request $request)
     {
         // Validar los datos del formulario
@@ -20,14 +22,13 @@ class LoginController extends Controller
             'password' => 'required',
         ]);
 
-        // Intentar autenticar: esto buscará en la tabla "users", columna "password"
-        // gracias a que en config/auth.php tienes el provider apuntando a App\Models\User
+        // Intentar autenticar al usuario
         if (Auth::attempt($request->only('email', 'password'))) {
-            // Si las credenciales son correctas
+            // Si las credenciales son correctas, redirigir a la ruta 'estadisticas'
             return response()->json([
                 'success'  => true,
                 'message'  => 'Inicio de sesión exitoso.',
-                'redirect' => route('estadisticas'),
+                'redirect' => route('estadisticas.index'),
             ]);
         }
 

@@ -5,13 +5,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Campañas de Marketing</title>
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
-    <link href="{{ asset('css/navbar.css') }}" rel="stylesheet" />
     <link href="{{ asset('css/login.css') }}" rel="stylesheet" />
     <!-- Meta CSRF token -->
     <meta name="csrf-token" content="{{ csrf_token() }}">
 </head>
 <body class="login-page">
-    @include('layouts.navbar')
 
     <div class="container d-flex justify-content-center align-items-center vh-100">
         <div class="login-box">
@@ -39,40 +37,31 @@
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
     <!-- Configuración global de AJAX -->
     <script>
-        $.ajaxSetup({
-            headers: {
-                'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+       $('#loginForm').submit(function(e) {
+    e.preventDefault();
+
+    $.ajax({
+        url: '/login',
+        method: 'POST',
+        data: {
+            email: $('#email').val(),
+            password: $('#password').val(),
+            _token: $('input[name="_token"]').val()
+        },
+        success: function(response) {
+            if (response.success) {
+                window.location.href = response.redirect;
+            } else {
+                alert(response.message);
             }
-        });
+        },
+        error: function(xhr) {
+            console.error(xhr.responseText);
+            alert('Error en el servidor');
+        }
+    });
+});
 
-        $(document).ready(function () {
-            $('#loginForm').on('submit', function (e) {
-                e.preventDefault();
-                var formData = $(this).serialize();
-
-                $.ajax({
-                    url: '{{ route("login.submit") }}',
-                    type: 'POST',
-                    data: formData,
-                    success: function (response) {
-                        if (response.success) {
-                            $('#message').removeClass('alert-danger').addClass('alert-success')
-                                .text(response.message).fadeIn();
-                            setTimeout(function () {
-                                window.location.href = response.redirect;
-                            }, 2000);
-                        } else {
-                            $('#message').removeClass('alert-success').addClass('alert-danger')
-                                .text(response.message).fadeIn();
-                        }
-                    },
-                    error: function (xhr) {
-                        $('#message').removeClass('alert-success').addClass('alert-danger')
-                            .text('Error en la solicitud. Inténtalo de nuevo.').fadeIn();
-                    }
-                });
-            });
-        });
     </script>
 
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>

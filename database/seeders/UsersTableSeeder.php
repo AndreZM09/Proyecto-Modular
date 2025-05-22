@@ -13,7 +13,7 @@ class UsersTableSeeder extends Seeder // <-- Rename si quieres
         User::create([
             'name' => 'Test User',            // O el nombre que prefieras
             'email' => 'test@example.com',    // Debe ser único
-            'password' => Hash::make('password123'), // Password encriptada
+            'password' => bcrypt('password123'), // Password encriptada
         ]);
     }
 }

@@ -8,7 +8,7 @@ use App\Http\Controllers\EstadisticasController;
 
 // Ruta principal - redirige a correos
 Route::get('/', function () {
-    return redirect()->route('correos');
+    return redirect()->route('login');
 });
 
 // Ruta para mostrar el formulario de login
