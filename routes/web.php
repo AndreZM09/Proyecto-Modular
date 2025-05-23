@@ -5,11 +5,15 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\EstadisticasController;
+use App\Http\Controllers\CampañasController;
 
 // Ruta principal - redirige a correos
 Route::get('/', function () {
     return redirect()->route('login');
 });
+
+//ruta de campañas (imagenes enviadas en bd)
+Route::get('/campañas', [CampañasController::class, 'index'])->name('campañas');
 
 // Ruta para mostrar el formulario de login
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');
