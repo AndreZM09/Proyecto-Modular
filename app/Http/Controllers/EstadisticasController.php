@@ -14,25 +14,13 @@ class EstadisticasController extends Controller
 {
     public function index()
     {
+        // Obtener datos básicos
         $clicksCount = Click::count();
-        $totalEmails = 100; // Cambiar por el número real de emails enviados
         
-        $opened = $clicksCount;
-        $notOpened = $totalEmails - $opened;
-
-        // Obtener clics por municipio
-        $clicksByMunicipio = Click::select('municipio', DB::raw('count(*) as total'))
-                                ->groupBy('municipio')
-                                ->orderBy('total', 'desc')
-                                ->get();
-
-        $totalClicsMunicipios = $clicksByMunicipio->sum('total');
-
-        // Preparar colores para municipios
-        $municipioColors = [];
-        foreach ($clicksByMunicipio as $municipio) {
-            $municipioColors[$municipio->municipio] = $this->getMunicipioColor($municipio->municipio);
-        }
+        // Contar los correos enviados (registros únicos en la tabla clicks)
+        $emailsSent = Click::distinct('email')->count('email');
+        
+        $opened = $clicksCount; // Consideramos que los clics son emails abiertos
 
         // Obtener la última imagen subida
         $currentImage = EmailImage::latest()->first();
@@ -40,11 +28,7 @@ class EstadisticasController extends Controller
         return view('estadisticas', compact(
             'clicksCount',
             'opened',
-            'notOpened',
-            'totalEmails',
-            'clicksByMunicipio',
-            'totalClicsMunicipios',
-            'municipioColors',
+            'emailsSent',
             'currentImage'
         ));
     }
@@ -108,6 +92,7 @@ class EstadisticasController extends Controller
     {
         $email = $request->query('email');
         $ip = $request->ip();
+        $imageId = $request->query('img_id'); // Obtener el ID de la imagen
 
         // Obtener ubicación basada en IP
         $location = Location::get($ip);
@@ -117,13 +102,65 @@ class EstadisticasController extends Controller
             $municipio = $this->determinarMunicipio($location->cityName);
         }
 
-        Click::create([
-            'email' => $email,
-            'ip_address' => $ip,
-            'municipio' => $municipio
-        ]);
+        // Primero verificamos si ya existe un registro para este email y esta imagen
+        $existingClick = Click::where('email', $email)
+                              ->where('id_img', $imageId)
+                              ->first();
 
-        return response('Clic registrado', 200);
+        if ($existingClick) {
+            // Si ya existe, actualizamos la fecha del clic
+            $existingClick->update(['created_at' => now()]);
+            $idPerson = $existingClick->id_person;
+        } else {
+            // Determinar el siguiente id_person para esta imagen
+            $maxIdPerson = Click::where('id_img', $imageId)->max('id_person') ?? 0;
+            $idPerson = $maxIdPerson + 1;
+
+            // Crear nuevo registro
+            Click::create([
+                'email' => $email,
+                'ip_address' => $ip,
+                'municipio' => $municipio,
+                'id_img' => $imageId,
+                'id_person' => $idPerson,
+                'email_sent_at' => now() // Por defecto, consideramos que el correo se envió en este momento
+            ]);
+        }
+
+        // Redirigir al destino final (Google en este caso)
+        return redirect('https://www.google.com');
+    }
+
+    /**
+     * Registra la apertura de un correo
+     */
+    public function trackOpen(Request $request)
+    {
+        $email = $request->query('email');
+        $imageId = $request->query('img_id');
+
+        // Verificar si ya existe un registro para este email y esta imagen
+        $existingClick = Click::where('email', $email)
+                              ->where('id_img', $imageId)
+                              ->first();
+
+        if (!$existingClick) {
+            // Determinar el siguiente id_person para esta imagen
+            $maxIdPerson = Click::where('id_img', $imageId)->max('id_person') ?? 0;
+            $idPerson = $maxIdPerson + 1;
+
+            // Crear registro solo con la apertura
+            Click::create([
+                'email' => $email,
+                'id_img' => $imageId,
+                'id_person' => $idPerson,
+                'email_sent_at' => now()
+            ]);
+        }
+
+        // Devolver una imagen transparente de 1x1 pixel
+        $img = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
+        return response($img)->header('Content-Type', 'image/gif');
     }
 
     private function determinarMunicipio($cityName)
@@ -255,39 +292,112 @@ class EstadisticasController extends Controller
      */
     public function showEstadisticas()
     {
-        // Todos los datos que ya tienes en el método index
+        // Obtener datos básicos
         $clicksCount = DB::table('clicks')->count();
-        $opened = $clicksCount; 
-        $notOpened = 100 - $opened; 
-        $totalEmails = 100; 
-
-        // Datos de clics por municipio
-        $clicksByMunicipio = DB::table('clicks')
-            ->select('municipio', DB::raw('count(*) as total'))
-            ->groupBy('municipio')
-            ->get();
-
-        $totalClicsMunicipios = $clicksByMunicipio->sum('total');
-
-        // Colores para los municipios
-        $municipioColors = [];
-        $baseColors = ['#28a745', '#007bff', '#ffc107', '#6610f2', '#6f42c1', '#e83e8c', '#fd7e14'];
-        $i = 0;
         
-        foreach ($clicksByMunicipio as $municipio) {
-            $municipioColors[$municipio->municipio] = $baseColors[$i % count($baseColors)];
-            $i++;
-        }
+        // Contar los correos enviados (registros únicos en la tabla clicks)
+        $emailsSent = DB::table('clicks')->distinct()->count('email');
+        
+        $opened = $clicksCount; // Consideramos que los clics son emails abiertos
 
-        return view('estadisticas.index', compact(
+        // Obtener la última imagen subida
+        $currentImage = EmailImage::latest()->first();
+        
+        // Obtener estadísticas por campaña (por imagen)
+        $campaignStats = $this->getCampaignStats();
+
+        return view('estadisticas', compact(
             'clicksCount',
             'opened',
-            'notOpened',
-            'totalEmails',
-            'clicksByMunicipio',
-            'totalClicsMunicipios',
-            'municipioColors'
+            'emailsSent',
+            'currentImage',
+            'campaignStats'
         ));
+    }
+
+    /**
+     * Muestra estadísticas de una campaña específica por su ID
+     */
+    public function showCampaignStats($id)
+    {
+        // Verificar que la campaña exista
+        $campaign = EmailImage::findOrFail($id);
+        
+        // Obtener estadísticas de esta campaña específica
+        $campaignStats = $this->getCampaignStats($id);
+        
+        // Si no hay estadísticas, crear un array vacío para evitar errores
+        if (empty($campaignStats)) {
+            $campaignStats = [];
+        }
+        
+        // Contar correos enviados para esta campaña
+        $emailsSent = Click::where('id_img', $id)->count();
+        
+        // Contar clics para esta campaña
+        $clicksCount = Click::where('id_img', $id)
+                          ->whereNotNull('ip_address')
+                          ->count();
+        
+        // Abiertos = clics
+        $opened = $clicksCount;
+        
+        // Título para la vista
+        $campaignTitle = $campaign->subject ?: 'Campaña ' . $campaign->id;
+        
+        return view('estadisticas', compact(
+            'clicksCount',
+            'opened',
+            'emailsSent',
+            'campaign',
+            'campaignStats',
+            'campaignTitle'
+        ));
+    }
+
+    /**
+     * Obtiene estadísticas detalladas por campaña (imagen)
+     * 
+     * @param int|null $campaignId ID de la campaña específica (opcional)
+     * @return array
+     */
+    private function getCampaignStats($campaignId = null)
+    {
+        // Obtener campañas - todas o una específica
+        $query = EmailImage::query();
+        
+        if ($campaignId) {
+            $query->where('id', $campaignId);
+        }
+        
+        $campaigns = $query->get();
+        $stats = [];
+        
+        foreach ($campaigns as $campaign) {
+            // Contar correos enviados para esta campaña
+            $sent = Click::where('id_img', $campaign->id)->count();
+            
+            // Si hay correos enviados, calcular estadísticas
+            if ($sent > 0) {
+                // Contar clics únicos para esta campaña (por email)
+                $clicks = Click::where('id_img', $campaign->id)
+                              ->whereNotNull('ip_address')
+                              ->distinct('email')
+                              ->count('email');
+                
+                $stats[] = [
+                    'id' => $campaign->id,
+                    'name' => $campaign->subject ?: 'Campaña ' . $campaign->id,
+                    'image' => $campaign->filename,
+                    'sent' => $sent,
+                    'clicks' => $clicks,
+                    'open_rate' => $sent > 0 ? round(($clicks / $sent) * 100, 1) : 0,
+                    'date' => $campaign->created_at->format('d/m/Y H:i')
+                ];
+            }
+        }
+        
+        return $stats;
     }
 
     /**
@@ -389,6 +499,21 @@ class EstadisticasController extends Controller
                     'success' => false,
                     'message' => 'Error al enviar los correos: ' . implode("\n", $output)
                 ], 500);
+            }
+            
+            // Registrar los envíos en la tabla clicks
+            $now = now();
+            
+            // Determinar el siguiente id_person para esta imagen
+            $maxIdPerson = Click::where('id_img', $image->id)->max('id_person') ?? 0;
+            
+            foreach ($validEmails as $index => $email) {
+                Click::create([
+                    'email' => $email,
+                    'id_img' => $image->id,
+                    'id_person' => $maxIdPerson + $index + 1, // Incrementar id_person para cada email
+                    'email_sent_at' => $now
+                ]);
             }
             
             // Respuesta exitosa

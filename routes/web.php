@@ -6,6 +6,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\CampañasController;
+use App\Http\Controllers\TestController;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Support\Facades\Response;
 
@@ -26,6 +27,7 @@ Route::post('/login', [LoginController::class, 'login'])->name('login.submit');
 // Rutas para las vistas separadas
 Route::get('/correos', [EstadisticasController::class, 'showCorreos'])->name('correos');
 Route::get('/estadisticas', [EstadisticasController::class, 'showEstadisticas'])->name('estadisticas.index');
+Route::get('/estadisticas/campana/{id}', [EstadisticasController::class, 'showCampaignStats'])->name('estadisticas.campaign');
 
 Route::post('/estadisticas/upload-image', [EstadisticasController::class, 'uploadImage'])->name('estadisticas.upload-image');
 Route::get('/estadisticas/current-image', [EstadisticasController::class, 'getCurrentImage'])->name('estadisticas.current-image');
@@ -50,18 +52,9 @@ Route::get('/campaign-images/{filename}', function ($filename) {
     ]);
 })->name('campaign.image');
 
-Route::get('/track-click', function (Request $request) {
-    // Registrar el clic en la base de datos
-    $email = $request->query('email', 'desconocido');
-    $ip = $request->ip();
-    
-    DB::table('clicks')->insert([
-        'email' => $email,
-        'ip_address' => $ip,
-        'municipio' => 'Desconocido',
-        'created_at' => now(),
-    ]);
+// Rutas de seguimiento
+Route::get('/track-click', [EstadisticasController::class, 'trackClick']);
+Route::get('/track-open', [EstadisticasController::class, 'trackOpen']);
 
-    // Redirigir al destino final (Google en este caso)
-    return Redirect::to('https://www.google.com');
-});
+// Ruta de prueba
+Route::get('/test-click', [TestController::class, 'testClick']);

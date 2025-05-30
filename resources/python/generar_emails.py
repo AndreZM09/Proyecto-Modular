@@ -27,16 +27,29 @@ def main():
         # Obtener la URL base
         base_url = os.getenv('APP_URL', 'http://127.0.0.1:8000')
         
-        # Plantilla HTML simplificada
+        # Obtener la imagen y su ID
+        image_info = get_latest_image()
+        if not image_info or 'path' not in image_info:
+            print("ERROR: No se pudo obtener la imagen para el correo")
+            sys.exit(1)
+            
+        image_path = image_info['path']
+        image_id = image_info['id']
+        
+        if not os.path.exists(image_path):
+            print("ERROR: La imagen no existe en la ruta especificada")
+            sys.exit(1)
+        
+        # Plantilla HTML con el ID de la imagen incluido en los enlaces
         html_content = f'''
         <html>
           <body>
             <p>{description}</p>
             <p>Haz clic en la imagen:</p>
-            <a href="{base_url}/track-click?email={{email}}">
+            <a href="{base_url}/track-click?email={{email}}&img_id={image_id}">
               <img src="cid:image1" alt="Imagen" style="width:300px;">
             </a>
-            <img src="{base_url}/track-open?email={{email}}" width="1" height="1" style="display:none;">
+            <img src="{base_url}/track-open?email={{email}}&img_id={image_id}" width="1" height="1" style="display:none;">
           </body>
         </html>
         '''
@@ -60,17 +73,8 @@ def main():
             sys.exit(1)
             
         print("Se enviaran correos a " + str(len(recipients)) + " destinatarios")
+        print(f"Usando la imagen con ID: {image_id}")
         
-        # Obtener la imagen
-        image_path = get_latest_image()
-        if not image_path:
-            print("ERROR: No se pudo obtener la imagen para el correo")
-            sys.exit(1)
-            
-        if not os.path.exists(image_path):
-            print("ERROR: La imagen no existe en la ruta especificada")
-            sys.exit(1)
-            
         # Enviar a cada destinatario
         for recipient in recipients:
             try:
@@ -97,7 +101,7 @@ def get_latest_image():
         )
         
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT filename FROM email_images ORDER BY created_at DESC LIMIT 1")
+        cursor.execute("SELECT id, filename FROM email_images ORDER BY created_at DESC LIMIT 1")
         result = cursor.fetchone()
         
         if result:
@@ -114,12 +118,16 @@ def get_latest_image():
             )
             
             # Comprobar cuál existe y devolverlo
+            image_info = {'id': result['id']}
+            
             if os.path.exists(public_path):
                 print("Usando imagen desde public/storage: " + public_path)
-                return public_path
+                image_info['path'] = public_path
+                return image_info
             elif os.path.exists(storage_path):
                 print("Usando imagen desde storage/app/public: " + storage_path)
-                return storage_path
+                image_info['path'] = storage_path
+                return image_info
             else:
                 print("Error: La imagen " + result['filename'] + " no se encontró en ninguna ubicación")
         

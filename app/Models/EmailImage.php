@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class EmailImage extends Model
 {
@@ -18,8 +19,19 @@ class EmailImage extends Model
         'description'
     ];
 
-    public function emails()
+    /**
+     * Obtiene todos los emails asociados a esta imagen
+     */
+    public function emails(): HasMany
     {
         return $this->hasMany(Email::class);
+    }
+
+    /**
+     * Obtiene todos los clics asociados a esta imagen
+     */
+    public function clicks(): HasMany
+    {
+        return $this->hasMany(Click::class, 'id_img');
     }
 } 

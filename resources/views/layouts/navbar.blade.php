@@ -13,9 +13,6 @@
                     <a class="nav-link {{ request()->is('correos') ? 'active' : '' }}" href="{{ url('/correos') }}">Correos</a>
                 </li>
                 <li class="nav-item">
-                    <a class="nav-link {{ request()->is('estadisticas') ? 'active' : '' }}" href="{{ url('/estadisticas') }}">Estadísticas</a>
-                </li>
-                <li class="nav-item">
                     <a class="nav-link {{ request()->is('campañas') ? 'active' : '' }}" href="{{ route('campañas') }}">Campañas</a>
                 </li>
             </ul>

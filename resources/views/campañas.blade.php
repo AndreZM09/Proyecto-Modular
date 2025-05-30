@@ -9,12 +9,17 @@
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm">
                     <div class="card-img-container">
-                        <img src="{{ route('campaign.image', ['filename' => $imagen->filename]) }}" class="card-img-top" alt="{{ $imagen->original_name }}">
+                        <a href="{{ route('estadisticas.campaign', ['id' => $imagen->id]) }}" title="Ver estadísticas de esta campaña">
+                            <img src="{{ route('campaign.image', ['filename' => $imagen->filename]) }}" class="card-img-top" alt="{{ $imagen->original_name }}">
+                        </a>
                     </div>
                     <div class="card-body">
                         <h5 class="card-title">{{ $imagen->subject }}</h5>
                         <p class="card-text">{{ $imagen->description }}</p>
                         <p class="text-muted small">Enviado: {{ \Carbon\Carbon::parse($imagen->created_at)->format('d/m/Y H:i') }}</p>
+                        <a href="{{ route('estadisticas.campaign', ['id' => $imagen->id]) }}" class="btn btn-sm btn-primary mt-2">
+                            <i class="bi bi-bar-chart-fill"></i> Ver estadísticas
+                        </a>
                     </div>
                 </div>
             </div>
