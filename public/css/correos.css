@@ -1,11 +1,11 @@
 /* CSS moderno para la página de Correos */
 
 :root {
-    --primary-color: #667eea;
-    --primary-gradient: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    --secondary-color: #f093fb;
-    --secondary-gradient: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-    --success-gradient: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+    --primary-color: #0d3768; /* Azul marino similar a login */
+    --primary-gradient: linear-gradient(135deg, #0d3768 0%, #1a508b 100%);
+    --secondary-color: #b80f22; /* Color secundario del login */
+    --secondary-gradient: linear-gradient(135deg, #b80f22 0%, #d01125 100%);
+    --success-gradient: linear-gradient(135deg, #0d3768 0%, #0056b3 100%);
     --card-shadow: 0 10px 25px rgba(0,0,0,0.1);
     --card-hover-shadow: 0 15px 35px rgba(0,0,0,0.15);
     --border-radius: 15px;
@@ -135,7 +135,7 @@ body {
 
 .form-control:focus {
     border-color: var(--primary-color);
-    box-shadow: 0 0 0 0.2rem rgba(102, 126, 234, 0.25);
+    box-shadow: 0 0 0 0.2rem rgba(13, 55, 104, 0.25);
     transform: translateY(-2px);
 }
 
@@ -171,7 +171,7 @@ textarea.form-control {
     font-size: 0.9rem;
     margin-top: 0.5rem;
     padding: 0.8rem;
-    background: rgba(102, 126, 234, 0.05);
+    background: rgba(13, 55, 104, 0.05);
     border-radius: 8px;
     border-left: 3px solid var(--primary-color);
     display: flex;
@@ -204,13 +204,13 @@ textarea.form-control {
 .btn-primary {
     background: var(--primary-gradient);
     color: white;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
+    box-shadow: 0 4px 15px rgba(13, 55, 104, 0.3);
 }
 
 .btn-primary:hover {
     transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4);
-    background: linear-gradient(135deg, #764ba2 0%, #667eea 100%);
+    box-shadow: 0 6px 20px rgba(13, 55, 104, 0.4);
+    background: linear-gradient(135deg, #1a508b 0%, #0d3768 100%);
     color: white;
 }
 

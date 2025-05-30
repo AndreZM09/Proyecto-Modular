@@ -20,7 +20,7 @@
             overflow-x: hidden;
         }
         body {
-            padding-top: 0 !important;
+            padding-top: 70px !important; /* Espacio para la barra de navegación fija */
             margin-top: 0 !important;
         }
         .navbar {

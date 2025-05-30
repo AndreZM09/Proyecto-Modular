@@ -9,6 +9,11 @@
     <link href="{{ asset('css/navbar.css') }}" rel="stylesheet" />
     <link href="{{ asset('css/estadisticas.css') }}" rel="stylesheet" />
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        body {
+            padding-top: 70px !important; /* Espacio para la barra de navegación fija */
+        }
+    </style>
 </head>
 
 <body class="estadisticas-page">

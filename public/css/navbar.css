@@ -1,32 +1,39 @@
 /* navbar.css */
 
 /* Fondo personalizado de la barra */
-.navbar-custom {
-    background-color: #f5f6f6;
-    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
-    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.1);
+.navbar {
+    background-color: #0d3768; /* Azul marino que coincide con el login */
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+    box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
     position: fixed;
     top: 0;
+    left: 0;
     width: 100%;
     z-index: 1000;
+    padding: 0.5rem 1rem;
+    margin: 0 !important;
+    border-radius: 0;
 }
 
 /* Centrar el texto con el logo */
 .navbar-brand {
     display: flex;
     align-items: center;
+    color: #ffffff !important;
+    font-weight: 600;
 }
 
 /* Tamaño del logo */
 .navbar-brand img {
-    width: 60px;
-    height: 60px;
+    width: 30px;
+    height: auto;
     margin-right: 10px;
 }
 
-/* ✅ Aplica padding solo si NO es la página de login */
+/* Aplica padding solo si NO es la página de login */
 body:not(.login-page) {
-    padding-top: 70px;
+    padding-top: 70px !important;
+    margin-top: 0 !important;
 }
 
 /* Navbar Custom Styles */
@@ -35,19 +42,32 @@ body, html {
     padding: 0;
 }
 
-.navbar {
-    margin: 0 !important;
-    border-radius: 0;
-    padding: 0.5rem 1rem;
-}
-
 /* Reset margins for the first element after navbar */
 .navbar + * {
     margin-top: 0 !important;
 }
 
 /* Active link styles */
+.navbar .nav-link {
+    color: rgba(255, 255, 255, 0.8) !important;
+    transition: all 0.3s ease;
+}
+
+.navbar .nav-link:hover {
+    color: #ffffff !important;
+}
+
 .navbar .nav-link.active {
-    color: #0056b3 !important;
+    color: #ffffff !important;
     font-weight: bold;
+    border-bottom: 2px solid #b80f22;
+}
+
+/* Estilo para el botón del toggler en móviles */
+.navbar-toggler {
+    border-color: rgba(255, 255, 255, 0.5);
+}
+
+.navbar-toggler-icon {
+    background-image: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 30 30'%3e%3cpath stroke='rgba(255, 255, 255, 0.8)' stroke-linecap='round' stroke-miterlimit='10' stroke-width='2' d='M4 7h22M4 15h22M4 23h22'/%3e%3c/svg%3e");
 }
