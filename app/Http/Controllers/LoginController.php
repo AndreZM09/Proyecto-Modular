@@ -24,11 +24,11 @@ class LoginController extends Controller
 
         // Intentar autenticar al usuario
         if (Auth::attempt($request->only('email', 'password'))) {
-            // Si las credenciales son correctas, redirigir a la ruta 'estadisticas'
+            // Si las credenciales son correctas, redirigir a la ruta 'campañas'
             return response()->json([
                 'success'  => true,
                 'message'  => 'Inicio de sesión exitoso.',
-                'redirect' => route('estadisticas.index'),
+                'redirect' => route('campañas'),
             ]);
         }
 

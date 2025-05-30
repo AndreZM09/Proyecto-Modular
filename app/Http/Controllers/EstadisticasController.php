@@ -94,13 +94,19 @@ class EstadisticasController extends Controller
         $ip = $request->ip();
         $imageId = $request->query('img_id'); // Obtener el ID de la imagen
 
-        // Obtener ubicación basada en IP
-        $location = Location::get($ip);
+        // Deshabilitar temporalmente la ubicación para evitar errores
         $municipio = 'Desconocido';
-
-        if ($location) {
-            $municipio = $this->determinarMunicipio($location->cityName);
-        }
+        
+        // Comentado temporalmente para evitar errores
+        // try {
+        //     $location = Location::get($ip);
+        //     if ($location) {
+        //         $municipio = $this->determinarMunicipio($location->cityName);
+        //     }
+        // } catch (\Exception $e) {
+        //     \Log::warning('Error obteniendo ubicación: ' . $e->getMessage());
+        //     $municipio = 'Desconocido';
+        // }
 
         // Primero verificamos si ya existe un registro para este email y esta imagen
         $existingClick = Click::where('email', $email)
@@ -442,22 +448,99 @@ class EstadisticasController extends Controller
             // Obtener el archivo subido
             $file = $request->file('emailFile');
             $filePath = $file->path();
+            $extension = strtolower($file->getClientOriginalExtension());
             
-            // Leer el contenido del archivo como texto plano
-            $content = file_get_contents($filePath);
-            
-            // Extraer emails del contenido
+            // Extraer emails del contenido según el tipo de archivo
             $validEmails = [];
             
-            if ($content !== false) {
-                // Buscar correos electrónicos mediante expresión regular
-                preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $content, $matches);
+            // Procesar archivos Excel
+            if (in_array($extension, ['xlsx', 'xls'])) {
+                try {
+                    // Alternativa simple: leer el archivo como texto y buscar emails
+                    // Los archivos Excel también pueden contener texto legible
+                    $content = file_get_contents($filePath);
+                    
+                    \Log::info('Procesando archivo Excel:', [
+                        'extension' => $extension,
+                        'file_size' => strlen($content),
+                        'first_100_chars' => substr($content, 0, 100)
+                    ]);
+                    
+                    if ($content !== false) {
+                        // Buscar correos electrónicos mediante expresión regular
+                        preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $content, $matches);
+                        
+                        \Log::info('Emails encontrados en Excel:', [
+                            'matches' => $matches[0] ?? []
+                        ]);
+                        
+                        if (!empty($matches[0])) {
+                            foreach ($matches[0] as $email) {
+                                $email = trim($email);
+                                if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
+                                    $validEmails[] = $email;
+                                }
+                            }
+                        }
+                    }
+                    
+                    // Si no se encontraron emails en Excel, dar instrucciones específicas
+                    if (empty($validEmails)) {
+                        return response()->json([
+                            'success' => false,
+                            'message' => 'No se pudieron extraer emails del archivo Excel. Por favor:\n1. Abra su archivo Excel\n2. Seleccione los datos\n3. Copie y pegue en un archivo .txt\n4. O guarde como archivo CSV (.csv)\n\nArchivos recomendados: TXT, CSV'
+                        ], 400);
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error procesando archivo Excel: ' . $e->getMessage());
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Error al procesar el archivo Excel. Por favor, guarde el archivo como CSV (.csv) para mejor compatibilidad.'
+                    ], 500);
+                }
+            } elseif ($extension === 'csv') {
+                // Procesar archivos CSV de manera más eficiente
+                try {
+                    if (($handle = fopen($filePath, "r")) !== FALSE) {
+                        while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
+                            foreach ($data as $cellValue) {
+                                if (!empty($cellValue) && is_string($cellValue)) {
+                                    // Buscar emails en el contenido de la celda
+                                    preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $cellValue, $matches);
+                                    if (!empty($matches[0])) {
+                                        foreach ($matches[0] as $email) {
+                                            $email = trim($email);
+                                            if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
+                                                $validEmails[] = $email;
+                                            }
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                        fclose($handle);
+                    }
+                } catch (\Exception $e) {
+                    \Log::error('Error procesando archivo CSV: ' . $e->getMessage());
+                    return response()->json([
+                        'success' => false,
+                        'message' => 'Error al procesar el archivo CSV: ' . $e->getMessage()
+                    ], 500);
+                }
+            } else {
+                // Procesar archivos de texto (TXT, CSV, etc.)
+                $content = file_get_contents($filePath);
                 
-                if (!empty($matches[0])) {
-                    foreach ($matches[0] as $email) {
-                        $email = trim($email);
-                        if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
-                            $validEmails[] = $email;
+                if ($content !== false) {
+                    // Buscar correos electrónicos mediante expresión regular
+                    preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $content, $matches);
+                    
+                    if (!empty($matches[0])) {
+                        foreach ($matches[0] as $email) {
+                            $email = trim($email);
+                            if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
+                                $validEmails[] = $email;
+                            }
                         }
                     }
                 }

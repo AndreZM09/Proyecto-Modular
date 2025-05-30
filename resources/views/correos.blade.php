@@ -96,11 +96,11 @@
                                     <i class="bi bi-file-earmark-text"></i>
                                     Archivo de Correos
                                 </label>
-                                <input type="file" name="emailFile" id="emailFile" class="form-control" accept=".txt,.csv,.xlsx,.docx" required>
+                                <input type="file" name="emailFile" id="emailFile" class="form-control" accept=".txt,.csv,.xlsx,.xls,.docx" required>
                                 <div class="form-text">
                                     <i class="bi bi-lightbulb"></i>
                                     Suba un archivo que contenga direcciones de correo. El sistema extraerá las direcciones automáticamente.
-                                    <br><strong>Formatos soportados:</strong> TXT, CSV, XLSX, DOCX
+                                    <br><strong>Formatos soportados:</strong> Excel (XLS, XLSX), TXT, CSV, DOCX
                                 </div>
                             </div>
                         </div>
