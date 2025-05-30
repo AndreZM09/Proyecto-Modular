@@ -6,6 +6,8 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\LoginController;
 use App\Http\Controllers\EstadisticasController;
 use App\Http\Controllers\CampañasController;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Facades\Response;
 
 // Ruta principal - redirige a correos
 Route::get('/', function () {
@@ -30,6 +32,23 @@ Route::get('/estadisticas/current-image', [EstadisticasController::class, 'getCu
 
 Route::post('/estadisticas/send-test-email', [EstadisticasController::class, 'sendTestEmail'])->name('estadisticas.send-test-email');
 Route::post('/estadisticas/upload-email-list', [EstadisticasController::class, 'uploadEmailList'])->name('estadisticas.upload-email-list');
+
+// Ruta para servir las imágenes de email directamente
+Route::get('/campaign-images/{filename}', function ($filename) {
+    $path = storage_path('app/public/email_images/' . $filename);
+    
+    if (!file_exists($path)) {
+        abort(404);
+    }
+    
+    $file = file_get_contents($path);
+    $type = mime_content_type($path);
+    
+    return Response::make($file, 200, [
+        'Content-Type' => $type,
+        'Content-Disposition' => 'inline; filename="' . $filename . '"'
+    ]);
+})->name('campaign.image');
 
 Route::get('/track-click', function (Request $request) {
     // Registrar el clic en la base de datos

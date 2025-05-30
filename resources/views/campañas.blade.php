@@ -9,7 +9,7 @@
             <div class="col-md-4 mb-4">
                 <div class="card h-100 shadow-sm">
                     <div class="card-img-container">
-                        <img src="{{ asset('storage/email_images/' . $imagen->filename) }}" class="card-img-top" alt="{{ $imagen->original_name }}">
+                        <img src="{{ route('campaign.image', ['filename' => $imagen->filename]) }}" class="card-img-top" alt="{{ $imagen->original_name }}">
                     </div>
                     <div class="card-body">
                         <h5 class="card-title">{{ $imagen->subject }}</h5>
