@@ -48,7 +48,7 @@
                                 <input type="file" name="image" id="image" class="form-control" accept="image/*" required>
                                 <div class="form-text">
                                     <i class="bi bi-info-circle"></i>
-                                    Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 2MB
+                                    Formatos soportados: JPG, PNG, GIF, WEBP, BMP, TIFF, SVG. Sin límite de tamaño.
                                 </div>
                             </div>
                         </div>
@@ -63,6 +63,11 @@
                                         <i class="bi bi-image" style="font-size: 3rem; opacity: 0.3;"></i>
                                         <p class="mt-2 mb-0">Ninguna imagen seleccionada</p>
                                     </div>
+                                </div>
+                                <div id="clearImageContainer" class="mt-2 text-center" style="display: none;">
+                                    <button type="button" id="clearImage" class="btn btn-sm btn-outline-danger">
+                                        <i class="bi bi-trash"></i> Eliminar selección
+                                    </button>
                                 </div>
                             </div>
                         </div>
@@ -177,14 +182,38 @@
         document.getElementById('image').addEventListener('change', function(e) {
             const file = e.target.files[0];
             const preview = document.getElementById('imagePreview');
+            const clearContainer = document.getElementById('clearImageContainer');
             
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
                     preview.innerHTML = `<img src="${e.target.result}" class="img-fluid" style="max-height: 120px; border-radius: 10px; box-shadow: 0 4px 12px rgba(0,0,0,0.1);">`;
+                    clearContainer.style.display = 'block';
                 };
                 reader.readAsDataURL(file);
+            } else {
+                resetImagePreview();
             }
+        });
+
+        // Función para resetear la vista previa de imagen
+        function resetImagePreview() {
+            const preview = document.getElementById('imagePreview');
+            const clearContainer = document.getElementById('clearImageContainer');
+            
+            preview.innerHTML = `
+                <div class="text-muted">
+                    <i class="bi bi-image" style="font-size: 3rem; opacity: 0.3;"></i>
+                    <p class="mt-2 mb-0">Ninguna imagen seleccionada</p>
+                </div>
+            `;
+            clearContainer.style.display = 'none';
+        }
+
+        // Botón para limpiar la imagen seleccionada
+        document.getElementById('clearImage').addEventListener('click', function() {
+            document.getElementById('image').value = '';
+            resetImagePreview();
         });
 
         // Configuración CSRF para AJAX
