@@ -96,11 +96,21 @@
                                     <i class="bi bi-file-earmark-text"></i>
                                     Archivo de Correos
                                 </label>
-                                <input type="file" name="emailFile" id="emailFile" class="form-control" accept=".txt,.csv,.xlsx,.xls,.docx" required>
+                                <input type="file" name="emailFile" id="emailFile" class="form-control" accept=".txt,.csv,.xlsx,.xls" required>
                                 <div class="form-text">
                                     <i class="bi bi-lightbulb"></i>
-                                    Suba un archivo que contenga direcciones de correo. El sistema extraerá las direcciones automáticamente.
-                                    <br><strong>Formatos soportados:</strong> Excel (XLS, XLSX), TXT, CSV, DOCX
+                                    El archivo debe contener las columnas: email/correo, asunto/subject, mensaje/message, prioridad/priority
+                                </div>
+                                <div id="previewInfo" class="mt-3" style="display: none;">
+                                    <div class="alert alert-info">
+                                        <h6 class="mb-2"><i class="bi bi-info-circle"></i> Información del archivo:</h6>
+                                        <p class="mb-1">Total de correos válidos: <strong id="totalEmails">0</strong></p>
+                                        <div id="sampleEmails" class="small">
+                                            <p class="mb-1">Ejemplos de correos:</p>
+                                            <ul class="list-unstyled ps-3" id="emailsList">
+                                            </ul>
+                                        </div>
+                                    </div>
                                 </div>
                             </div>
                         </div>
@@ -132,7 +142,7 @@
                                     <i class="bi bi-tag"></i>
                                     Asunto del Correo
                                 </label>
-                                <input type="text" name="subject" class="form-control" placeholder="Ingrese el asunto del correo" required>
+                                <input type="text" name="subject" id="subject" class="form-control" placeholder="Se cargará del archivo Excel" readonly>
                             </div>
                         </div>
                         <div class="col-md-6">
@@ -141,7 +151,7 @@
                                     <i class="bi bi-flag"></i>
                                     Prioridad
                                 </label>
-                                <select name="priority" class="form-control">
+                                <select name="priority" id="priority" class="form-control" disabled>
                                     <option value="normal">📄 Normal</option>
                                     <option value="high">🔥 Alta</option>
                                     <option value="urgent">⚡ Urgente</option>
@@ -155,15 +165,15 @@
                             <i class="bi bi-chat-text"></i>
                             Mensaje del Correo
                         </label>
-                        <textarea name="description" class="form-control" rows="4" placeholder="Escriba el mensaje que aparecerá en el correo..." required></textarea>
+                        <textarea name="description" id="description" class="form-control" rows="4" placeholder="Se cargará del archivo Excel" readonly></textarea>
                     </div>
 
                     <div class="d-flex gap-3">
-                        <button type="submit" class="btn btn-primary">
+                        <button type="submit" class="btn btn-primary" id="submitBtn" disabled>
                             <i class="bi bi-rocket-takeoff"></i>
                             Enviar Campaña
                         </button>
-                        <button type="button" class="btn btn-outline-secondary">
+                        <button type="button" class="btn btn-outline-secondary" disabled>
                             <i class="bi bi-eye"></i>
                             Vista Previa
                         </button>
@@ -274,6 +284,71 @@
                     btn.classList.remove('loading');
                     btn.innerHTML = originalText;
                     btn.disabled = false;
+                }
+            });
+        });
+
+        // Manejar la previsualización del archivo Excel
+        document.getElementById('emailFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (!file) return;
+
+            const formData = new FormData();
+            formData.append('emailFile', file);
+
+            // Mostrar indicador de carga
+            $('#previewInfo').html('<div class="text-center"><i class="bi bi-hourglass-split"></i> Procesando archivo...</div>').show();
+            
+            // Deshabilitar campos mientras se procesa
+            $('#subject, #description, #priority').prop('disabled', true);
+            $('#submitBtn').prop('disabled', true);
+
+            // Enviar archivo para previsualización
+            $.ajax({
+                url: '{{ route("estadisticas.preview-excel") }}',
+                method: 'POST',
+                data: formData,
+                processData: false,
+                contentType: false,
+                headers: {
+                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
+                },
+                success: function(response) {
+                    if (response.success) {
+                        // Actualizar campos del formulario
+                        $('#subject').val(response.data.subject);
+                        $('#description').val(response.data.message);
+                        $('#priority').val(response.data.priority);
+                        
+                        // Mostrar información de previsualización
+                        $('#totalEmails').text(response.data.totalEmails);
+                        
+                        // Mostrar ejemplos de correos
+                        const emailsList = $('#emailsList');
+                        emailsList.empty();
+                        response.data.sampleEmails.forEach(function(email) {
+                            emailsList.append(`<li><i class="bi bi-check-circle-fill text-success"></i> ${email}</li>`);
+                        });
+                        
+                        // Mostrar el contenedor de previsualización
+                        $('#previewInfo').show();
+                        
+                        // Habilitar el botón de envío si hay correos válidos
+                        $('#submitBtn').prop('disabled', response.data.totalEmails === 0);
+                        
+                        // Mostrar mensaje de éxito
+                        showMessage('success', `Archivo procesado correctamente. Se encontraron ${response.data.totalEmails} correos válidos.`);
+                    } else {
+                        showMessage('error', response.message || 'Error al procesar el archivo');
+                    }
+                },
+                error: function(xhr) {
+                    let errorMessage = 'Error al procesar el archivo';
+                    if (xhr.responseJSON && xhr.responseJSON.message) {
+                        errorMessage = xhr.responseJSON.message;
+                    }
+                    showMessage('error', errorMessage);
+                    $('#previewInfo').hide();
                 }
             });
         });

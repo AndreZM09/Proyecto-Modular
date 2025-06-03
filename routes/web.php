@@ -34,6 +34,7 @@ Route::get('/estadisticas/current-image', [EstadisticasController::class, 'getCu
 
 Route::post('/estadisticas/send-test-email', [EstadisticasController::class, 'sendTestEmail'])->name('estadisticas.send-test-email');
 Route::post('/estadisticas/upload-email-list', [EstadisticasController::class, 'uploadEmailList'])->name('estadisticas.upload-email-list');
+Route::post('/estadisticas/preview-excel', [EstadisticasController::class, 'previewExcel'])->name('estadisticas.preview-excel');
 
 // Ruta para servir las imágenes de email directamente
 Route::get('/campaign-images/{filename}', function ($filename) {

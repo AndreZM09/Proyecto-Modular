@@ -14,6 +14,7 @@ return new class extends Migration
         Schema::create('clicks', function (Blueprint $table) {
             $table->id();
             $table->string('email')->nullable(); // Guarda el email si lo pasas como parámetro
+            $table->string('ip_address')->nullable(); // Para registrar los clicks
             $table->timestamp('created_at')->useCurrent();
         });
     }

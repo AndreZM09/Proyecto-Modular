@@ -16,7 +16,13 @@ class EmailImage extends Model
         'mime_type',
         'size',
         'subject',
-        'description'
+        'description',
+        'priority'
+    ];
+
+    protected $casts = [
+        'created_at' => 'datetime',
+        'updated_at' => 'datetime'
     ];
 
     /**

@@ -35,40 +35,47 @@ class EstadisticasController extends Controller
 
     public function uploadImage(Request $request)
     {
-        $request->validate([
-            'image' => 'required|image|mimes:jpeg,png,jpg,gif|max:2048',
-            'subject' => 'nullable|string|max:255',
-            'description' => 'nullable|string'
-        ]);
-
         try {
+            // Validar la solicitud
+            $request->validate([
+                'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,bmp,tiff,svg',
+                'subject' => 'nullable|string|max:255',
+                'description' => 'nullable|string',
+                'priority' => 'nullable|in:normal,high,urgent'
+            ]);
+
+            // Procesar y guardar la imagen
             if ($request->hasFile('image')) {
-                $file = $request->file('image');
-                $filename = time() . '_' . $file->getClientOriginalName();
+                $image = $request->file('image');
+                $filename = time() . '_' . $image->getClientOriginalName();
                 
-                // Guardar la imagen en el almacenamiento
-                $path = $file->storeAs('email_images', $filename, 'public');
+                // Mover la imagen al almacenamiento
+                $image->storeAs('public/email_images', $filename);
                 
                 // Crear registro en la base de datos
-                $emailImage = EmailImage::create([
+                EmailImage::create([
                     'filename' => $filename,
-                    'original_name' => $file->getClientOriginalName(),
-                    'mime_type' => $file->getMimeType(),
-                    'size' => $file->getSize(),
-                    'subject' => $request->input('subject', ''),
-                    'description' => $request->input('description', '')
+                    'original_name' => $image->getClientOriginalName(),
+                    'subject' => $request->input('subject'),
+                    'description' => $request->input('description'),
+                    'priority' => $request->input('priority', 'normal')
                 ]);
-
+                
                 return response()->json([
                     'success' => true,
-                    'message' => 'Imagen guardada exitosamente',
-                    'filename' => $filename
+                    'message' => 'Imagen subida exitosamente'
                 ]);
             }
+            
+            return response()->json([
+                'success' => false,
+                'message' => 'No se encontró ninguna imagen'
+            ], 400);
+            
         } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
-                'message' => 'Error al guardar la imagen: ' . $e->getMessage()
+                'message' => 'Error al subir la imagen: ' . $e->getMessage()
             ], 500);
         }
     }
@@ -415,14 +422,8 @@ class EstadisticasController extends Controller
             // Validación básica de la solicitud
             $request->validate([
                 'emailFile' => 'required|file|max:10240', // 10MB máximo
-                'subject' => 'nullable|string|max:255',
-                'description' => 'nullable|string'
             ]);
 
-            // Obtener los valores básicos
-            $subject = $request->input('subject', 'Correo importante');
-            $description = $request->input('description', 'Información importante para ti.');
-            
             // Verificar si hay imagen configurada
             $image = EmailImage::latest()->first();
             if (!$image) {
@@ -450,36 +451,60 @@ class EstadisticasController extends Controller
             $filePath = $file->path();
             $extension = strtolower($file->getClientOriginalExtension());
             
-            // Extraer emails del contenido según el tipo de archivo
+            // Variables para almacenar la información del Excel
             $validEmails = [];
+            $subject = '';
+            $message = '';
+            $priority = 'normal';
             
             // Procesar archivos Excel
             if (in_array($extension, ['xlsx', 'xls'])) {
                 try {
-                    // Alternativa simple: leer el archivo como texto y buscar emails
-                    // Los archivos Excel también pueden contener texto legible
-                    $content = file_get_contents($filePath);
+                    // Cargar el archivo Excel usando la biblioteca PhpSpreadsheet
+                    $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+                    $worksheet = $spreadsheet->getActiveSheet();
+                    $rows = $worksheet->toArray();
                     
-                    \Log::info('Procesando archivo Excel:', [
-                        'extension' => $extension,
-                        'file_size' => strlen($content),
-                        'first_100_chars' => substr($content, 0, 100)
-                    ]);
+                    // Buscar los encabezados en la primera fila
+                    $headers = array_map('strtolower', $rows[0]);
+                    $emailIndex = array_search('email', $headers);
+                    $subjectIndex = array_search('asunto', $headers);
+                    $messageIndex = array_search('mensaje', $headers);
+                    $priorityIndex = array_search('prioridad', $headers);
                     
-                    if ($content !== false) {
-                        // Buscar correos electrónicos mediante expresión regular
-                        preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $content, $matches);
+                    // Si no encontramos los encabezados, intentar con nombres alternativos
+                    if ($emailIndex === false) $emailIndex = array_search('correo', $headers);
+                    if ($subjectIndex === false) $subjectIndex = array_search('subject', $headers);
+                    if ($messageIndex === false) $messageIndex = array_search('message', $headers);
+                    if ($priorityIndex === false) $priorityIndex = array_search('priority', $headers);
+                    
+                    // Procesar cada fila
+                    for ($i = 1; $i < count($rows); $i++) {
+                        $row = $rows[$i];
                         
-                        \Log::info('Emails encontrados en Excel:', [
-                            'matches' => $matches[0] ?? []
-                        ]);
+                        // Procesar email
+                        if ($emailIndex !== false && !empty($row[$emailIndex])) {
+                            $email = trim($row[$emailIndex]);
+                            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                                $validEmails[] = $email;
+                            }
+                        }
                         
-                        if (!empty($matches[0])) {
-                            foreach ($matches[0] as $email) {
-                                $email = trim($email);
-                                if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
-                                    $validEmails[] = $email;
-                                }
+                        // Obtener el asunto de la primera fila válida
+                        if (empty($subject) && $subjectIndex !== false && !empty($row[$subjectIndex])) {
+                            $subject = trim($row[$subjectIndex]);
+                        }
+                        
+                        // Obtener el mensaje de la primera fila válida
+                        if (empty($message) && $messageIndex !== false && !empty($row[$messageIndex])) {
+                            $message = trim($row[$messageIndex]);
+                        }
+                        
+                        // Obtener la prioridad de la primera fila válida
+                        if ($priority === 'normal' && $priorityIndex !== false && !empty($row[$priorityIndex])) {
+                            $tmpPriority = strtolower(trim($row[$priorityIndex]));
+                            if (in_array($tmpPriority, ['normal', 'high', 'urgent'])) {
+                                $priority = $tmpPriority;
                             }
                         }
                     }
@@ -488,33 +513,58 @@ class EstadisticasController extends Controller
                     if (empty($validEmails)) {
                         return response()->json([
                             'success' => false,
-                            'message' => 'No se pudieron extraer emails del archivo Excel. Por favor:\n1. Abra su archivo Excel\n2. Seleccione los datos\n3. Copie y pegue en un archivo .txt\n4. O guarde como archivo CSV (.csv)\n\nArchivos recomendados: TXT, CSV'
+                            'message' => 'No se encontraron direcciones de correo válidas en el archivo Excel. El archivo debe tener una columna llamada "email" o "correo".'
                         ], 400);
                     }
                 } catch (\Exception $e) {
                     \Log::error('Error procesando archivo Excel: ' . $e->getMessage());
                     return response()->json([
                         'success' => false,
-                        'message' => 'Error al procesar el archivo Excel. Por favor, guarde el archivo como CSV (.csv) para mejor compatibilidad.'
+                        'message' => 'Error al procesar el archivo Excel. Por favor, asegúrese de que el archivo tenga el formato correcto.'
                     ], 500);
                 }
             } elseif ($extension === 'csv') {
-                // Procesar archivos CSV de manera más eficiente
+                // Procesar archivos CSV
                 try {
                     if (($handle = fopen($filePath, "r")) !== FALSE) {
-                        while (($data = fgetcsv($handle, 1000, ",")) !== FALSE) {
-                            foreach ($data as $cellValue) {
-                                if (!empty($cellValue) && is_string($cellValue)) {
-                                    // Buscar emails en el contenido de la celda
-                                    preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $cellValue, $matches);
-                                    if (!empty($matches[0])) {
-                                        foreach ($matches[0] as $email) {
-                                            $email = trim($email);
-                                            if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
-                                                $validEmails[] = $email;
-                                            }
-                                        }
-                                    }
+                        // Leer encabezados
+                        $headers = array_map('strtolower', fgetcsv($handle));
+                        $emailIndex = array_search('email', $headers);
+                        $subjectIndex = array_search('asunto', $headers);
+                        $messageIndex = array_search('mensaje', $headers);
+                        $priorityIndex = array_search('prioridad', $headers);
+                        
+                        // Si no encontramos los encabezados, intentar con nombres alternativos
+                        if ($emailIndex === false) $emailIndex = array_search('correo', $headers);
+                        if ($subjectIndex === false) $subjectIndex = array_search('subject', $headers);
+                        if ($messageIndex === false) $messageIndex = array_search('message', $headers);
+                        if ($priorityIndex === false) $priorityIndex = array_search('priority', $headers);
+                        
+                        // Procesar cada fila
+                        while (($data = fgetcsv($handle)) !== FALSE) {
+                            // Procesar email
+                            if ($emailIndex !== false && !empty($data[$emailIndex])) {
+                                $email = trim($data[$emailIndex]);
+                                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                                    $validEmails[] = $email;
+                                }
+                            }
+                            
+                            // Obtener el asunto de la primera fila válida
+                            if (empty($subject) && $subjectIndex !== false && !empty($data[$subjectIndex])) {
+                                $subject = trim($data[$subjectIndex]);
+                            }
+                            
+                            // Obtener el mensaje de la primera fila válida
+                            if (empty($message) && $messageIndex !== false && !empty($data[$messageIndex])) {
+                                $message = trim($data[$messageIndex]);
+                            }
+                            
+                            // Obtener la prioridad de la primera fila válida
+                            if ($priority === 'normal' && $priorityIndex !== false && !empty($data[$priorityIndex])) {
+                                $tmpPriority = strtolower(trim($data[$priorityIndex]));
+                                if (in_array($tmpPriority, ['normal', 'high', 'urgent'])) {
+                                    $priority = $tmpPriority;
                                 }
                             }
                         }
@@ -527,23 +577,6 @@ class EstadisticasController extends Controller
                         'message' => 'Error al procesar el archivo CSV: ' . $e->getMessage()
                     ], 500);
                 }
-            } else {
-                // Procesar archivos de texto (TXT, CSV, etc.)
-                $content = file_get_contents($filePath);
-                
-                if ($content !== false) {
-                    // Buscar correos electrónicos mediante expresión regular
-                    preg_match_all('/[\w\.-_]+@[\w\.-]+\.[a-zA-Z]{2,}/', $content, $matches);
-                    
-                    if (!empty($matches[0])) {
-                        foreach ($matches[0] as $email) {
-                            $email = trim($email);
-                            if (filter_var($email, FILTER_VALIDATE_EMAIL) && !in_array($email, $validEmails)) {
-                                $validEmails[] = $email;
-                            }
-                        }
-                    }
-                }
             }
             
             // Verificar si se encontraron emails
@@ -554,13 +587,20 @@ class EstadisticasController extends Controller
                 ], 400);
             }
             
+            // Actualizar la imagen con la información del Excel
+            $image->update([
+                'subject' => $subject ?: 'Correo importante',
+                'description' => $message ?: 'Información importante para ti.',
+                'priority' => $priority
+            ]);
+            
             // Guardar los correos en un archivo temporal
             $emailListPath = storage_path('app/email_list_bulk_' . time() . '.txt');
             file_put_contents($emailListPath, implode("\n", $validEmails));
             
             // Configurar las variables para el script Python
             putenv("EMAIL_SUBJECT=" . $subject);
-            putenv("EMAIL_DESCRIPTION=" . $description);
+            putenv("EMAIL_DESCRIPTION=" . $message);
             putenv("EMAIL_LIST_PATH=" . $emailListPath);
             
             // Ejecutar el script Python
@@ -594,7 +634,7 @@ class EstadisticasController extends Controller
                 Click::create([
                     'email' => $email,
                     'id_img' => $image->id,
-                    'id_person' => $maxIdPerson + $index + 1, // Incrementar id_person para cada email
+                    'id_person' => $maxIdPerson + $index + 1,
                     'email_sent_at' => $now
                 ]);
             }
@@ -611,6 +651,144 @@ class EstadisticasController extends Controller
                 'trace' => $e->getTraceAsString()
             ]);
             
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al procesar el archivo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    /**
+     * Previsualiza el contenido del archivo Excel
+     */
+    public function previewExcel(Request $request)
+    {
+        try {
+            // Validación básica de la solicitud
+            $request->validate([
+                'emailFile' => 'required|file|max:10240', // 10MB máximo
+            ]);
+            
+            // Obtener el archivo subido
+            $file = $request->file('emailFile');
+            $filePath = $file->path();
+            $extension = strtolower($file->getClientOriginalExtension());
+            
+            // Variables para almacenar la información del Excel
+            $validEmails = [];
+            $subject = '';
+            $message = '';
+            $priority = 'normal';
+            $totalEmails = 0;
+            
+            if (in_array($extension, ['xlsx', 'xls'])) {
+                // Cargar el archivo Excel usando PhpSpreadsheet
+                $spreadsheet = \PhpOffice\PhpSpreadsheet\IOFactory::load($filePath);
+                $worksheet = $spreadsheet->getActiveSheet();
+                $rows = $worksheet->toArray();
+                
+                // Buscar los encabezados en la primera fila
+                $headers = array_map('strtolower', $rows[0]);
+                $emailIndex = array_search('email', $headers);
+                $subjectIndex = array_search('asunto', $headers);
+                $messageIndex = array_search('mensaje', $headers);
+                $priorityIndex = array_search('prioridad', $headers);
+                
+                // Si no encontramos los encabezados, intentar con nombres alternativos
+                if ($emailIndex === false) $emailIndex = array_search('correo', $headers);
+                if ($subjectIndex === false) $subjectIndex = array_search('subject', $headers);
+                if ($messageIndex === false) $messageIndex = array_search('message', $headers);
+                if ($priorityIndex === false) $priorityIndex = array_search('priority', $headers);
+                
+                // Procesar cada fila
+                for ($i = 1; $i < count($rows); $i++) {
+                    $row = $rows[$i];
+                    
+                    // Procesar email
+                    if ($emailIndex !== false && !empty($row[$emailIndex])) {
+                        $email = trim($row[$emailIndex]);
+                        if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                            $validEmails[] = $email;
+                        }
+                    }
+                    
+                    // Obtener el asunto de la primera fila válida
+                    if (empty($subject) && $subjectIndex !== false && !empty($row[$subjectIndex])) {
+                        $subject = trim($row[$subjectIndex]);
+                    }
+                    
+                    // Obtener el mensaje de la primera fila válida
+                    if (empty($message) && $messageIndex !== false && !empty($row[$messageIndex])) {
+                        $message = trim($row[$messageIndex]);
+                    }
+                    
+                    // Obtener la prioridad de la primera fila válida
+                    if ($priority === 'normal' && $priorityIndex !== false && !empty($row[$priorityIndex])) {
+                        $tmpPriority = strtolower(trim($row[$priorityIndex]));
+                        if (in_array($tmpPriority, ['normal', 'high', 'urgent'])) {
+                            $priority = $tmpPriority;
+                        }
+                    }
+                }
+            } elseif ($extension === 'csv') {
+                if (($handle = fopen($filePath, "r")) !== FALSE) {
+                    // Leer encabezados
+                    $headers = array_map('strtolower', fgetcsv($handle));
+                    $emailIndex = array_search('email', $headers);
+                    $subjectIndex = array_search('asunto', $headers);
+                    $messageIndex = array_search('mensaje', $headers);
+                    $priorityIndex = array_search('prioridad', $headers);
+                    
+                    // Si no encontramos los encabezados, intentar con nombres alternativos
+                    if ($emailIndex === false) $emailIndex = array_search('correo', $headers);
+                    if ($subjectIndex === false) $subjectIndex = array_search('subject', $headers);
+                    if ($messageIndex === false) $messageIndex = array_search('message', $headers);
+                    if ($priorityIndex === false) $priorityIndex = array_search('priority', $headers);
+                    
+                    // Procesar cada fila
+                    while (($data = fgetcsv($handle)) !== FALSE) {
+                        // Procesar email
+                        if ($emailIndex !== false && !empty($data[$emailIndex])) {
+                            $email = trim($data[$emailIndex]);
+                            if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                                $validEmails[] = $email;
+                            }
+                        }
+                        
+                        // Obtener el asunto de la primera fila válida
+                        if (empty($subject) && $subjectIndex !== false && !empty($data[$subjectIndex])) {
+                            $subject = trim($data[$subjectIndex]);
+                        }
+                        
+                        // Obtener el mensaje de la primera fila válida
+                        if (empty($message) && $messageIndex !== false && !empty($data[$messageIndex])) {
+                            $message = trim($data[$messageIndex]);
+                        }
+                        
+                        // Obtener la prioridad de la primera fila válida
+                        if ($priority === 'normal' && $priorityIndex !== false && !empty($data[$priorityIndex])) {
+                            $tmpPriority = strtolower(trim($data[$priorityIndex]));
+                            if (in_array($tmpPriority, ['normal', 'high', 'urgent'])) {
+                                $priority = $tmpPriority;
+                            }
+                        }
+                    }
+                    fclose($handle);
+                }
+            }
+            
+            return response()->json([
+                'success' => true,
+                'data' => [
+                    'subject' => $subject ?: '',
+                    'message' => $message ?: '',
+                    'priority' => $priority,
+                    'totalEmails' => count($validEmails),
+                    'sampleEmails' => array_slice($validEmails, 0, 5) // Mostrar solo los primeros 5 emails como muestra
+                ]
+            ]);
+            
+        } catch (\Exception $e) {
             return response()->json([
                 'success' => false,
                 'message' => 'Error al procesar el archivo: ' . $e->getMessage()
