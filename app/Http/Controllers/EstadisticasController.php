@@ -49,11 +49,32 @@ class EstadisticasController extends Controller
                 $image = $request->file('image');
                 $filename = time() . '_' . $image->getClientOriginalName();
                 
+                // Registrar información sobre el archivo
+                \Log::info('Procesando archivo de imagen:', [
+                    'original_name' => $image->getClientOriginalName(),
+                    'mime_type' => $image->getMimeType(),
+                    'size' => $image->getSize(),
+                    'filename' => $filename
+                ]);
+                
+                // Asegurarnos de que el directorio existe
+                $storagePath = storage_path('app/public/email_images');
+                if (!file_exists($storagePath)) {
+                    mkdir($storagePath, 0755, true);
+                }
+                
                 // Mover la imagen al almacenamiento
-                $image->storeAs('public/email_images', $filename);
+                $image->move($storagePath, $filename);
+                
+                // Verificar que el archivo se guardó correctamente
+                $fullPath = $storagePath . '/' . $filename;
+                \Log::info('Imagen guardada en storage:', [
+                    'full_path' => $fullPath,
+                    'exists' => file_exists($fullPath)
+                ]);
                 
                 // Crear registro en la base de datos
-                EmailImage::create([
+                $emailImage = EmailImage::create([
                     'filename' => $filename,
                     'original_name' => $image->getClientOriginalName(),
                     'subject' => $request->input('subject'),
@@ -61,9 +82,28 @@ class EstadisticasController extends Controller
                     'priority' => $request->input('priority', 'normal')
                 ]);
                 
+                \Log::info('Registro creado en la base de datos:', [
+                    'id' => $emailImage->id,
+                    'filename' => $emailImage->filename,
+                    'subject' => $emailImage->subject
+                ]);
+                
+                // Verificar que la imagen es accesible desde la web
+                $publicPath = public_path('storage/email_images/' . $filename);
+                \Log::info('Verificando accesibilidad web:', [
+                    'public_path' => $publicPath,
+                    'exists' => file_exists($publicPath),
+                    'url' => asset('storage/email_images/' . $filename)
+                ]);
+                
                 return response()->json([
                     'success' => true,
-                    'message' => 'Imagen subida exitosamente'
+                    'message' => 'Imagen subida exitosamente',
+                    'data' => [
+                        'id' => $emailImage->id,
+                        'filename' => $emailImage->filename,
+                        'url' => asset('storage/email_images/' . $filename)
+                    ]
                 ]);
             }
             
@@ -73,6 +113,11 @@ class EstadisticasController extends Controller
             ], 400);
             
         } catch (\Exception $e) {
+            \Log::error('Error en uploadImage:', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString()
+            ]);
+            
             return response()->json([
                 'success' => false,
                 'message' => 'Error al subir la imagen: ' . $e->getMessage()

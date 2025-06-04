@@ -6,19 +6,26 @@ use Illuminate\Support\Facades\Schema;
 
 return new class extends Migration
 {
-    public function up()
+    /**
+     * Run the migrations.
+     */
+    public function up(): void
     {
         Schema::create('email_images', function (Blueprint $table) {
             $table->id();
             $table->string('filename');
             $table->string('original_name');
-            $table->string('mime_type');
-            $table->integer('size');
+            $table->string('subject')->nullable();
+            $table->text('description')->nullable();
+            $table->string('priority')->default('normal');
             $table->timestamps();
         });
     }
 
-    public function down()
+    /**
+     * Reverse the migrations.
+     */
+    public function down(): void
     {
         Schema::dropIfExists('email_images');
     }
