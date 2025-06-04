@@ -364,12 +364,22 @@ class EstadisticasController extends Controller
         // Obtener estadísticas por campaña (por imagen)
         $campaignStats = $this->getCampaignStats();
 
+        // Obtener la lista de correos enviados para la última campaña
+        $emailList = [];
+        if ($currentImage) {
+            $emailList = Click::where('id_img', $currentImage->id)
+                ->select('email', 'email_sent_at', 'ip_address', 'created_at')
+                ->orderBy('email_sent_at', 'desc')
+                ->get();
+        }
+
         return view('estadisticas', compact(
             'clicksCount',
             'opened',
             'emailsSent',
             'currentImage',
-            'campaignStats'
+            'campaignStats',
+            'emailList'
         ));
     }
 
@@ -399,6 +409,12 @@ class EstadisticasController extends Controller
         
         // Abiertos = clics
         $opened = $clicksCount;
+
+        // Obtener la lista de correos enviados para esta campaña
+        $emailList = Click::where('id_img', $id)
+            ->select('email', 'email_sent_at', 'ip_address', 'created_at')
+            ->orderBy('email_sent_at', 'desc')
+            ->get();
         
         // Título para la vista
         $campaignTitle = $campaign->subject ?: 'Campaña ' . $campaign->id;
@@ -409,7 +425,8 @@ class EstadisticasController extends Controller
             'emailsSent',
             'campaign',
             'campaignStats',
-            'campaignTitle'
+            'campaignTitle',
+            'emailList'
         ));
     }
 
