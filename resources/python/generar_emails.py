@@ -7,8 +7,8 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from dotenv import load_dotenv
 
-# Cargar variables de entorno
-load_dotenv()
+# Cargar variables de entorno con encoding específico
+load_dotenv(encoding='utf-8-sig')
 
 def main():
     try:
@@ -18,6 +18,8 @@ def main():
         
         if not sender or not password:
             print("ERROR: Falta configuracion de email (EMAIL_SENDER o EMAIL_PASSWORD)")
+            print(f"EMAIL_SENDER: {sender}")
+            print(f"EMAIL_PASSWORD: {'***' if password else 'None'}")
             sys.exit(1)
         
         # Obtener el asunto y descripción, con valores predeterminados simples
@@ -26,6 +28,11 @@ def main():
         
         # Obtener la URL base
         base_url = os.getenv('APP_URL', 'http://127.0.0.1:8000')
+        
+        print(f"Configuracion cargada:")
+        print(f"- Sender: {sender}")
+        print(f"- Subject: {subject}")
+        print(f"- Base URL: {base_url}")
         
         # Obtener la imagen y su ID
         image_info = get_latest_image()
@@ -38,7 +45,10 @@ def main():
         
         if not os.path.exists(image_path):
             print("ERROR: La imagen no existe en la ruta especificada")
+            print(f"Ruta verificada: {image_path}")
             sys.exit(1)
+        
+        print(f"Imagen encontrada: {image_path}")
         
         # Plantilla HTML con el ID de la imagen incluido en los enlaces
         html_content = f'''
@@ -54,41 +64,99 @@ def main():
         </html>
         '''
         
-        # Obtener la lista de destinatarios
+        # Obtener los datos de emails (JSON con datos individuales o lista simple)
+        email_data_path = os.getenv('EMAIL_DATA_PATH')
         email_list_path = os.getenv('EMAIL_LIST_PATH')
-        if not email_list_path or not os.path.exists(email_list_path):
-            print("ERROR: Archivo de emails no encontrado")
-            sys.exit(1)
-            
-        # Leer los emails - con encoding explícito
+        
         recipients = []
-        with open(email_list_path, 'r', encoding='utf-8') as f:
-            for line in f:
-                email = line.strip()
-                if email:  # Verificar que no esté vacío
-                    recipients.append(email)
+        
+        if email_data_path and os.path.exists(email_data_path):
+            # Cargar datos individuales desde JSON
+            try:
+                import json
+                with open(email_data_path, 'r', encoding='utf-8') as f:
+                    email_data = json.load(f)
+                for data in email_data:
+                    recipients.append({
+                        'email': data['email'],
+                        'subject': data['subject'],
+                        'description': data['message']
+                    })
+                print(f"Cargados {len(recipients)} destinatarios con datos individuales")
+            except Exception as e:
+                print(f"ERROR leyendo archivo JSON: {e}")
+                sys.exit(1)
+        elif email_list_path and os.path.exists(email_list_path):
+            # Usar método anterior con datos globales
+            try:
+                with open(email_list_path, 'r', encoding='utf-8') as f:
+                    for line in f:
+                        email = line.strip()
+                        if email:
+                            recipients.append({
+                                'email': email,
+                                'subject': subject,
+                                'description': description
+                            })
+            except UnicodeDecodeError:
+                try:
+                    with open(email_list_path, 'r', encoding='latin-1') as f:
+                        for line in f:
+                            email = line.strip()
+                            if email:
+                                recipients.append({
+                                    'email': email,
+                                    'subject': subject,
+                                    'description': description
+                                })
+                except Exception as e:
+                    print(f"ERROR leyendo archivo de emails: {e}")
+                    sys.exit(1)
+        else:
+            print(f"ERROR: No se encontró archivo de emails")
+            sys.exit(1)
         
         if not recipients:
             print("ERROR: No se encontraron destinatarios validos")
             sys.exit(1)
             
-        print("Se enviaran correos a " + str(len(recipients)) + " destinatarios")
+        print(f"Se enviaran correos a {len(recipients)} destinatarios")
         print(f"Usando la imagen con ID: {image_id}")
         
-        # Enviar a cada destinatario
-        for recipient in recipients:
+        # Enviar a cada destinatario con su asunto y descripción individual
+        successful_sends = 0
+        for recipient_data in recipients:
             try:
-                email_content = html_content.replace("{email}", recipient)
-                send_email(sender, password, recipient, subject, email_content, image_path)
-                print("Email enviado a: " + recipient)
-            except Exception as e:
-                print("Error al enviar email: " + str(e))
+                email = recipient_data['email']
+                email_subject = recipient_data['subject']
+                email_description = recipient_data['description']
                 
-        print("Proceso completado.")
+                html_content = f'''
+                <html>
+                  <body>
+                    <p>{email_description}</p>
+                    <p>Haz clic en la imagen:</p>
+                    <a href="{base_url}/track-click?email={email}&img_id={image_id}">
+                      <img src="cid:image1" alt="Imagen" style="width:300px;">
+                    </a>
+                    <img src="{base_url}/track-open?email={email}&img_id={image_id}" width="1" height="1" style="display:none;">
+                  </body>
+                </html>
+                '''
+                
+                send_email(sender, password, email, email_subject, html_content, image_path)
+                print(f"Email enviado a: {email} - Asunto: {email_subject}")
+                successful_sends += 1
+            except Exception as e:
+                print(f"Error al enviar email a {recipient_data.get('email', 'unknown')}: {str(e)}")
+                
+        print(f"Proceso completado. {successful_sends}/{len(recipients)} correos enviados exitosamente.")
         sys.exit(0)
     
     except Exception as e:
-        print("ERROR GENERAL: " + str(e))
+        print(f"ERROR GENERAL: {str(e)}")
+        import traceback
+        traceback.print_exc()
         sys.exit(1)
 
 def get_latest_image():
@@ -121,20 +189,23 @@ def get_latest_image():
             image_info = {'id': result['id']}
             
             if os.path.exists(public_path):
-                print("Usando imagen desde public/storage: " + public_path)
+                print(f"Usando imagen desde public/storage: {public_path}")
                 image_info['path'] = public_path
                 return image_info
             elif os.path.exists(storage_path):
-                print("Usando imagen desde storage/app/public: " + storage_path)
+                print(f"Usando imagen desde storage/app/public: {storage_path}")
                 image_info['path'] = storage_path
                 return image_info
             else:
-                print("Error: La imagen " + result['filename'] + " no se encontró en ninguna ubicación")
+                print(f"Error: La imagen {result['filename']} no se encontró en ninguna ubicación")
+                print(f"Rutas verificadas:")
+                print(f"  - {public_path}")
+                print(f"  - {storage_path}")
         
         return None
         
     except Exception as e:
-        print("Error al obtener la imagen de la base de datos: " + str(e))
+        print(f"Error al obtener la imagen de la base de datos: {str(e)}")
         return None
     finally:
         if 'connection' in locals() and connection.is_connected():
@@ -143,33 +214,36 @@ def get_latest_image():
 
 def send_email(sender, password, recipient, subject, html_content, image_path, 
               smtp_server='smtp.gmail.com', port=587):
-    msg = MIMEMultipart('related')
-    msg['From'] = sender
-    msg['To'] = recipient
-    msg['Subject'] = subject
+    try:
+        msg = MIMEMultipart('related')
+        msg['From'] = sender
+        msg['To'] = recipient
+        msg['Subject'] = subject
 
-    msg_alternative = MIMEMultipart('alternative')
-    msg.attach(msg_alternative)
+        msg_alternative = MIMEMultipart('alternative')
+        msg.attach(msg_alternative)
 
-    text_part = MIMEText('Este correo contiene una imagen.', 'plain')
-    msg_alternative.attach(text_part)
+        text_part = MIMEText('Este correo contiene una imagen.', 'plain')
+        msg_alternative.attach(text_part)
 
-    html_part = MIMEText(html_content, 'html', 'utf-8')  # Especificar codificación utf-8
-    msg_alternative.attach(html_part)
+        html_part = MIMEText(html_content, 'html', 'utf-8')  # Especificar codificación utf-8
+        msg_alternative.attach(html_part)
 
-    # Adjuntar la imagen
-    with open(image_path, 'rb') as img_file:
-        img = MIMEImage(img_file.read())
-        img.add_header('Content-ID', '<image1>')
-        img.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_path))
-        msg.attach(img)
+        # Adjuntar la imagen
+        with open(image_path, 'rb') as img_file:
+            img = MIMEImage(img_file.read())
+            img.add_header('Content-ID', '<image1>')
+            img.add_header('Content-Disposition', 'inline', filename=os.path.basename(image_path))
+            msg.attach(img)
 
-    # Enviar el correo
-    server = smtplib.SMTP(smtp_server, port)
-    server.starttls()
-    server.login(sender, password)
-    server.sendmail(sender, recipient, msg.as_string())
-    server.quit()
+        # Enviar el correo
+        server = smtplib.SMTP(smtp_server, port)
+        server.starttls()
+        server.login(sender, password)
+        server.sendmail(sender, recipient, msg.as_string())
+        server.quit()
+    except Exception as e:
+        raise Exception(f"Error en send_email: {str(e)}")
 
 if __name__ == '__main__':
     main()

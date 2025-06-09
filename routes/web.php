@@ -33,6 +33,7 @@ Route::post('/estadisticas/upload-image', [EstadisticasController::class, 'uploa
 Route::get('/estadisticas/current-image', [EstadisticasController::class, 'getCurrentImage'])->name('estadisticas.current-image');
 
 Route::post('/estadisticas/send-test-email', [EstadisticasController::class, 'sendTestEmail'])->name('estadisticas.send-test-email');
+Route::post('/estadisticas/send-bulk-email', [EstadisticasController::class, 'sendBulkEmail'])->name('estadisticas.send-bulk-email');
 Route::post('/estadisticas/upload-email-list', [EstadisticasController::class, 'uploadEmailList'])->name('estadisticas.upload-email-list');
 Route::post('/estadisticas/preview-excel', [EstadisticasController::class, 'previewExcel'])->name('estadisticas.preview-excel');
 
