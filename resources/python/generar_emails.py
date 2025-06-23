@@ -6,6 +6,7 @@ from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from dotenv import load_dotenv
+import base64
 
 # Cargar variables de entorno con encoding específico
 load_dotenv(encoding='utf-8-sig')
@@ -23,8 +24,24 @@ def main():
             sys.exit(1)
         
         # Obtener el asunto y descripción, con valores predeterminados simples
-        subject = os.getenv('EMAIL_SUBJECT', 'Email de prueba')
-        description = os.getenv('EMAIL_DESCRIPTION', 'Este es un email de prueba.')
+        # Se obtienen las versiones Base64 y se decodifican
+        encoded_subject = os.getenv('EMAIL_SUBJECT_B64')
+        encoded_description = os.getenv('EMAIL_DESCRIPTION_B64')
+        
+        subject = "Email de prueba"
+        description = "Este es un email de prueba."
+        
+        if encoded_subject:
+            try:
+                subject = base64.b64decode(encoded_subject).decode('utf-8')
+            except Exception as e:
+                print(f"ADVERTENCIA: No se pudo decodificar el asunto B64: {e}")
+        
+        if encoded_description:
+            try:
+                description = base64.b64decode(encoded_description).decode('utf-8')
+            except Exception as e:
+                print(f"ADVERTENCIA: No se pudo decodificar la descripción B64: {e}")
         
         # Obtener la URL base
         base_url = os.getenv('APP_URL', 'http://127.0.0.1:8000')
@@ -128,6 +145,8 @@ def main():
         for recipient_data in recipients:
             try:
                 email = recipient_data['email']
+                # Asegurarse de decodificar asunto y descripción si vienen de un archivo JSON procesado previamente
+                # o si son pasados directamente como ya decodificados del entorno
                 email_subject = recipient_data['subject']
                 email_description = recipient_data['description']
                 

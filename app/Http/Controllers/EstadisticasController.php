@@ -269,6 +269,10 @@ class EstadisticasController extends Controller
             $subject = $request->input('subject', 'Correo importante');
             $description = $request->input('description', 'Información importante para ti.');
             
+            // Base64 encode subject and description for safe passing via environment variables
+            $encodedSubject = base64_encode($subject);
+            $encodedDescription = base64_encode($description);
+            
             // Verificar si hay imagen configurada
             $image = EmailImage::latest()->first();
             if (!$image) {
@@ -296,12 +300,12 @@ class EstadisticasController extends Controller
             file_put_contents($emailListPath, $email, LOCK_EX);
             
             // Configurar las variables para el script Python
-            putenv("EMAIL_SUBJECT=" . $subject);
-            putenv("EMAIL_DESCRIPTION=" . $description);
+            putenv("EMAIL_SUBJECT_B64=" . $encodedSubject);
+            putenv("EMAIL_DESCRIPTION_B64=" . $encodedDescription);
             putenv("EMAIL_LIST_PATH=" . $emailListPath);
             
             // Ejecutar el script Python
-            $command = 'python ' . base_path() . '/resources/python/generar_emails.py 2>&1';
+            $command = 'py ' . base_path() . '/resources/python/generar_emails.py 2>&1';
             exec($command, $output, $returnCode);
             
             \Log::info('Resultado del script Python:', [
@@ -485,6 +489,10 @@ class EstadisticasController extends Controller
             $subject = $request->input('subject');
             $description = $request->input('description');
             
+            // Asegurarse de que el asunto y la descripción estén en UTF-8
+            $subject = mb_convert_encoding($subject, 'UTF-8', 'auto');
+            $description = mb_convert_encoding($description, 'UTF-8', 'auto');
+            
             // Procesar archivo para obtener lista de emails
             $validEmails = [];
             $filePath = $file->path();
@@ -561,7 +569,7 @@ class EstadisticasController extends Controller
             
             // Ejecutar script Python
             putenv("EMAIL_DATA_PATH=" . $emailListPath);
-            $command = 'python ' . base_path() . '/resources/python/generar_emails.py 2>&1';
+            $command = 'py ' . base_path() . '/resources/python/generar_emails.py 2>&1';
             exec($command, $output, $returnCode);
             
             // Limpiar archivo temporal
@@ -815,7 +823,7 @@ class EstadisticasController extends Controller
             putenv("EMAIL_DATA_PATH=" . $emailListPath);
             
             // Ejecutar el script Python
-            $command = 'python ' . base_path() . '/resources/python/generar_emails.py 2>&1';
+            $command = 'py ' . base_path() . '/resources/python/generar_emails.py 2>&1';
             exec($command, $output, $returnCode);
             
             \Log::info('Resultado del script Python para envío masivo:', [
