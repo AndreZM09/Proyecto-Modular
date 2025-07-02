@@ -55,8 +55,8 @@ Route::get('/campaign-images/{filename}', function ($filename) {
 })->name('campaign.image');
 
 // Rutas de seguimiento
-Route::get('/track-click', [EstadisticasController::class, 'trackClick']);
-Route::get('/track-open', [EstadisticasController::class, 'trackOpen']);
+Route::get('/clicks/track/{id_img}/{email}', [EstadisticasController::class, 'trackClick'])->name('clicks.track');
+Route::get('/emails/open/{id_img}/{email}', [EstadisticasController::class, 'trackOpen'])->name('clicks.open');
 
 // Ruta de prueba
 Route::get('/test-click', [TestController::class, 'testClick']);

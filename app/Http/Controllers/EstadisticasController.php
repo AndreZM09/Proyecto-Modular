@@ -15,20 +15,17 @@ class EstadisticasController extends Controller
     public function index()
     {
         // Obtener datos básicos
-        $clicksCount = Click::count();
-        
-        // Contar los correos enviados (registros únicos en la tabla clicks)
-        $emailsSent = Click::distinct('email')->count('email');
-        
-        $opened = $clicksCount; // Consideramos que los clics son emails abiertos
+        $totalEmailsSent = Click::distinct('email')->count('email');
+        $totalEmailsOpened = Click::whereNotNull('email_opened_at')->distinct('email')->count('email');
+        $totalClicks = Click::whereNotNull('clicked_at')->distinct('email')->count('email');
 
         // Obtener la última imagen subida
         $currentImage = EmailImage::latest()->first();
 
         return view('estadisticas', compact(
-            'clicksCount',
-            'opened',
-            'emailsSent',
+            'totalEmailsSent',
+            'totalEmailsOpened',
+            'totalClicks',
             'currentImage'
         ));
     }
@@ -41,7 +38,8 @@ class EstadisticasController extends Controller
                 'image' => 'required|image|mimes:jpeg,png,jpg,gif,webp,bmp,tiff,svg',
                 'subject' => 'nullable|string|max:255',
                 'description' => 'nullable|string',
-                'priority' => 'nullable|in:normal,high,urgent'
+                'priority' => 'nullable|in:normal,high,urgent',
+                'link_redirection' => 'nullable|url|max:2048'
             ]);
 
             // Procesar y guardar la imagen
@@ -79,7 +77,8 @@ class EstadisticasController extends Controller
                     'original_name' => $image->getClientOriginalName(),
                     'subject' => $request->input('subject'),
                     'description' => $request->input('description'),
-                    'priority' => $request->input('priority', 'normal')
+                    'priority' => $request->input('priority', 'normal'),
+                    'link_redirection' => $request->input('link_redirection')
                 ]);
                 
                 \Log::info('Registro creado en la base de datos:', [
@@ -142,9 +141,28 @@ class EstadisticasController extends Controller
 
     public function trackClick(Request $request)
     {
+        // Log de entrada a la función trackClick
+        \Log::info('trackClick: Iniciando seguimiento de clic.', [
+            'query_params' => $request->query(),
+            'ip_address' => $request->ip()
+        ]);
+
         $email = $request->query('email');
         $ip = $request->ip();
         $imageId = $request->query('img_id'); // Obtener el ID de la imagen
+
+        \Log::info('trackClick: Parámetros recibidos', [
+            'email' => $email,
+            'imageId' => $imageId,
+            'ip' => $ip
+        ]);
+
+        $redirectUrl = 'https://www.google.com'; // URL por defecto
+        $image = EmailImage::find($imageId);
+        if ($image && $image->link_redirection) {
+            $redirectUrl = $image->link_redirection;
+            \Log::info('trackClick: Redirigiendo a URL personalizada.', ['url' => $redirectUrl]);
+        }
 
         // Deshabilitar temporalmente la ubicación para evitar errores
         $municipio = 'Desconocido';
@@ -166,8 +184,17 @@ class EstadisticasController extends Controller
                               ->first();
 
         if ($existingClick) {
-            // Si ya existe, actualizamos la fecha del clic
-            $existingClick->update(['created_at' => now()]);
+            // Si ya existe, actualizamos la fecha del clic y la de apertura
+            $existingClick->update([
+                'clicked_at' => now(),
+                'email_opened_at' => $existingClick->email_opened_at ?? now() // Si no se ha abierto, registrar apertura también
+            ]);
+            \Log::info('trackClick: Registro de clic existente actualizado.', [
+                'id' => $existingClick->id,
+                'email' => $existingClick->email,
+                'clicked_at' => $existingClick->clicked_at,
+                'email_opened_at' => $existingClick->email_opened_at
+            ]);
             $idPerson = $existingClick->id_person;
         } else {
             // Determinar el siguiente id_person para esta imagen
@@ -175,18 +202,26 @@ class EstadisticasController extends Controller
             $idPerson = $maxIdPerson + 1;
 
             // Crear nuevo registro
-            Click::create([
+            $newClick = Click::create([
                 'email' => $email,
                 'ip_address' => $ip,
                 'municipio' => $municipio,
                 'id_img' => $imageId,
                 'id_person' => $idPerson,
-                'email_sent_at' => now() // Por defecto, consideramos que el correo se envió en este momento
+                'email_sent_at' => now(), // Por defecto, consideramos que el correo se envió en este momento
+                'clicked_at' => now(), // Registrar el momento del clic
+                'email_opened_at' => now() // Registrar la apertura del correo también
+            ]);
+            \Log::info('trackClick: Nuevo registro de clic creado.', [
+                'id' => $newClick->id,
+                'email' => $newClick->email,
+                'clicked_at' => $newClick->clicked_at,
+                'email_opened_at' => $newClick->email_opened_at
             ]);
         }
 
-        // Redirigir al destino final (Google en este caso)
-        return redirect('https://www.google.com');
+        // Redirigir al destino final
+        return redirect($redirectUrl);
     }
 
     /**
@@ -194,25 +229,52 @@ class EstadisticasController extends Controller
      */
     public function trackOpen(Request $request)
     {
+        // Log de entrada a la función trackOpen
+        \Log::info('trackOpen: Iniciando seguimiento de apertura.', [
+            'query_params' => $request->query(),
+            'ip_address' => $request->ip()
+        ]);
+
         $email = $request->query('email');
         $imageId = $request->query('img_id');
+
+        \Log::info('trackOpen: Parámetros recibidos', [
+            'email' => $email,
+            'imageId' => $imageId
+        ]);
 
         // Verificar si ya existe un registro para este email y esta imagen
         $existingClick = Click::where('email', $email)
                               ->where('id_img', $imageId)
                               ->first();
 
-        if (!$existingClick) {
+        if ($existingClick) {
+            // Si ya existe, actualizamos solo la fecha de apertura
+            $existingClick->update([
+                'email_opened_at' => now()
+            ]);
+            \Log::info('trackOpen: Registro de apertura existente actualizado.', [
+                'id' => $existingClick->id,
+                'email' => $existingClick->email,
+                'email_opened_at' => $existingClick->email_opened_at
+            ]);
+        } else {
             // Determinar el siguiente id_person para esta imagen
             $maxIdPerson = Click::where('id_img', $imageId)->max('id_person') ?? 0;
             $idPerson = $maxIdPerson + 1;
 
             // Crear registro solo con la apertura
-            Click::create([
+            $newClick = Click::create([
                 'email' => $email,
                 'id_img' => $imageId,
                 'id_person' => $idPerson,
-                'email_sent_at' => now()
+                'email_sent_at' => now(), // Se considera que el correo fue enviado en este momento
+                'email_opened_at' => now() // Registrar la apertura del correo
+            ]);
+            \Log::info('trackOpen: Nuevo registro de apertura creado.', [
+                'id' => $newClick->id,
+                'email' => $newClick->email,
+                'email_opened_at' => $newClick->email_opened_at
             ]);
         }
 
