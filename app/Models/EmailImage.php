@@ -17,7 +17,8 @@ class EmailImage extends Model
         'size',
         'subject',
         'description',
-        'priority'
+        'priority',
+        'link_redirection'
     ];
 
     protected $casts = [

@@ -120,7 +120,7 @@
                             <p class="text-muted small">{{ $campaign['date'] }}</p>
                             
                             <div class="row align-items-center">
-                                @if($campaign['image'])
+                                @if(isset($campaign['image']))
                                 <div class="{{ isset($campaignTitle) ? 'col-md-3' : 'col-12' }}">
                                     <img src="{{ asset('storage/email_images/' . $campaign['image']) }}" 
                                          class="campaign-image my-3" alt="Imagen de campaña">
@@ -155,6 +155,112 @@
                 No hay datos de campañas disponibles.
             </div>
         @endif
+    </div>
+
+    <!-- Sección de detalles de la campaña -->
+    <div class="container mt-5">
+        <div class="card">
+            <div class="card-header bg-primary text-white">
+                <h5 class="mb-0">Detalles de la Campaña</h5>
+            </div>
+            <div class="card-body">
+                <div class="row">
+                    <!-- Imagen de la campaña -->
+                    <div class="col-md-4">
+                        @if(isset($currentImage) || isset($campaign))
+                            @php
+                                $imageDetails = isset($campaign) ? $campaign : $currentImage;
+                                $filename = is_array($imageDetails) ? $imageDetails['image'] : $imageDetails->filename;
+                            @endphp
+                            <img src="{{ asset('storage/email_images/' . $filename) }}" 
+                                 alt="Imagen de la campaña" 
+                                 class="img-fluid rounded">
+                        @else
+                            <div class="alert alert-info">
+                                No hay imagen configurada para esta campaña
+                            </div>
+                        @endif
+                    </div>
+                    <!-- Detalles de la campaña -->
+                    <div class="col-md-8">
+                        @if(isset($currentImage) || isset($campaign))
+                            @php
+                                $imageDetails = isset($campaign) ? $campaign : $currentImage;
+                                $subject = is_array($imageDetails) ? ($imageDetails['name'] ?? 'Sin asunto') : ($imageDetails->subject ?: 'Sin asunto');
+                                $created_at = is_array($imageDetails) ? ($imageDetails['date'] ?? 'Fecha no disponible') : $imageDetails->created_at->format('d/m/Y H:i');
+                                $description = is_array($imageDetails) ? ($imageDetails['description'] ?? 'Sin descripción') : ($imageDetails->description ?: 'Sin descripción');
+                                $priority = is_array($imageDetails) ? ($imageDetails['priority'] ?? 'normal') : ($imageDetails->priority ?: 'normal');
+                            @endphp
+                            <h4>{{ $subject }}</h4>
+                            <p class="text-muted mb-2">
+                                <strong>Fecha de creación:</strong> 
+                                {{ $created_at }}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Descripción:</strong><br>
+                                {{ $description }}
+                            </p>
+                            <p class="mb-2">
+                                <strong>Prioridad:</strong>
+                                <span class="badge {{ $priority === 'high' ? 'bg-danger' : ($priority === 'urgent' ? 'bg-warning' : 'bg-success') }}">
+                                    {{ ucfirst($priority) }}
+                                </span>
+                            </p>
+                        @endif
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lista de correos enviados -->
+    <div class="container mt-4">
+        <div class="card">
+            <div class="card-header bg-primary text-white d-flex justify-content-between align-items-center">
+                <h5 class="mb-0">Lista de Correos Enviados</h5>
+                <span class="badge bg-light text-dark">Total: {{ count($emailList) }}</span>
+            </div>
+            <div class="card-body">
+                <div class="table-responsive">
+                    <table class="table table-hover">
+                        <thead>
+                            <tr>
+                                <th>Correo</th>
+                                <th>Fecha de Envío</th>
+                                <th>Estado</th>
+                                <th>Última Interacción</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            @forelse($emailList as $email)
+                                <tr>
+                                    <td>{{ $email->email }}</td>
+                                    <td>{{ $email->email_sent_at ? $email->email_sent_at->format('d/m/Y H:i') : 'N/A' }}</td>
+                                    <td>
+                                        @if($email->ip_address)
+                                            <span class="badge bg-success">Clic realizado</span>
+                                        @else
+                                            <span class="badge bg-secondary">Sin interacción</span>
+                                        @endif
+                                    </td>
+                                    <td>
+                                        @if($email->created_at && $email->ip_address)
+                                            {{ $email->created_at->format('d/m/Y H:i') }}
+                                        @else
+                                            N/A
+                                        @endif
+                                    </td>
+                                </tr>
+                            @empty
+                                <tr>
+                                    <td colspan="4" class="text-center">No hay correos enviados para esta campaña</td>
+                                </tr>
+                            @endforelse
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
     </div>
 
     <script>

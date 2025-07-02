@@ -16,6 +16,8 @@ return new class extends Migration
             $table->foreignId('id_img')->nullable()->after('id')->comment('ID de la imagen enviada (email_images)');
             $table->foreignId('id_person')->nullable()->after('id_img')->comment('ID de la persona a quien se envió');
             $table->timestamp('email_sent_at')->nullable()->after('municipio')->comment('Cuando se envió el correo');
+            $table->timestamp('clicked_at')->nullable()->after('ip_address');
+            $table->timestamp('email_opened_at')->nullable()->after('ip_address');
             
             // Agregar índices para mejorar el rendimiento
             $table->index('id_img');
@@ -38,6 +40,8 @@ return new class extends Migration
             $table->dropColumn('id_img');
             $table->dropColumn('id_person');
             $table->dropColumn('email_sent_at');
+            $table->dropColumn('clicked_at');
+            $table->dropColumn('email_opened_at');
         });
     }
 };

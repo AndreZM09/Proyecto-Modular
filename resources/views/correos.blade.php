@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <meta name="csrf-token" content="{{ csrf_token() }}">
-    <title>📬 Correos - Campañas de Marketing</title>
+    <title>📬 Correos - Campañas de Marketing UDG</title>
 
     <!-- Bootstrap y CSS personalizados -->
     <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/css/bootstrap.min.css" rel="stylesheet" />
@@ -49,6 +49,17 @@
                                 <div class="form-text">
                                     <i class="bi bi-info-circle"></i>
                                     Formatos soportados: JPG, PNG, GIF, WEBP, BMP, TIFF, SVG. Sin límite de tamaño.
+                                </div>
+                            </div>
+                            <div class="mb-3">
+                                <label for="link_redirection" class="form-label">
+                                    <i class="bi bi-link"></i>
+                                    URL de Redirección (opcional)
+                                </label>
+                                <input type="url" name="link_redirection" id="link_redirection" class="form-control" placeholder="https://ejemplo.com">
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle"></i>
+                                    Si se proporciona, la imagen será un enlace a esta URL.
                                 </div>
                             </div>
                         </div>
@@ -151,8 +162,10 @@
                                             Imagen Actual de Campaña
                                         </label>
                                         @if($currentImage ?? null)
-                                            <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}" 
-                                                 alt="Imagen actual" class="img-fluid">
+                                            <a href="{{ route('clicks.track', ['id_img' => $currentImage->id, 'email' => 'RECIPIENT_EMAIL']) }}" target="_blank">
+                                                <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}"
+                                                     alt="Imagen actual" class="img-fluid">
+                                            </a>
                                             <p class="mt-2 mb-0 text-muted small">{{ $currentImage->subject ?? 'Sin título' }}</p>
                                         @else
                                             <div class="text-muted">
@@ -210,8 +223,10 @@
                                             Imagen Actual de Campaña
                                         </label>
                                         @if($currentImage ?? null)
-                                            <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}" 
-                                                 alt="Imagen actual" class="img-fluid">
+                                            <a href="{{ route('clicks.track', ['id_img' => $currentImage->id, 'email' => 'RECIPIENT_EMAIL']) }}" target="_blank">
+                                                <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}"
+                                                     alt="Imagen actual" class="img-fluid">
+                                            </a>
                                             <p class="mt-2 mb-0 text-muted small">{{ $currentImage->subject ?? 'Sin título' }}</p>
                                         @else
                                             <div class="text-muted">

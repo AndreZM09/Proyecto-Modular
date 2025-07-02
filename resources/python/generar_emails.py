@@ -59,7 +59,11 @@ def main():
             
         image_path = image_info['path']
         image_id = image_info['id']
-        
+        image_link_redirection = image_info['link_redirection']
+
+        click_url = f"{base_url}/clicks/track/{image_id}/{{email}}"
+        open_url = f"{base_url}/emails/open/{image_id}/{{email}}"
+
         if not os.path.exists(image_path):
             print("ERROR: La imagen no existe en la ruta especificada")
             print(f"Ruta verificada: {image_path}")
@@ -73,10 +77,10 @@ def main():
           <body>
             <p>{description}</p>
             <p>Haz clic en la imagen:</p>
-            <a href="{base_url}/track-click?email={{email}}&img_id={image_id}">
+            <a href="{click_url}">
               <img src="cid:image1" alt="Imagen" style="width:300px;">
             </a>
-            <img src="{base_url}/track-open?email={{email}}&img_id={image_id}" width="1" height="1" style="display:none;">
+            <img src="{open_url}" width="1" height="1" style="display:none;">
           </body>
         </html>
         '''
@@ -150,20 +154,27 @@ def main():
                 email_subject = recipient_data['subject']
                 email_description = recipient_data['description']
                 
-                html_content = f'''
+                # Construir URLs de seguimiento con el email del destinatario
+                personalized_click_url = click_url.replace('{{email}}', email)
+                personalized_open_url = open_url.replace('{{email}}', email)
+
+                # Determinar la URL de redirección final para el clic
+                final_redirect_url = image_link_redirection if image_link_redirection else personalized_click_url
+
+                html_content_with_email = f'''
                 <html>
                   <body>
                     <p>{email_description}</p>
                     <p>Haz clic en la imagen:</p>
-                    <a href="{base_url}/track-click?email={email}&img_id={image_id}">
+                    <a href="{final_redirect_url}">
                       <img src="cid:image1" alt="Imagen" style="width:300px;">
                     </a>
-                    <img src="{base_url}/track-open?email={email}&img_id={image_id}" width="1" height="1" style="display:none;">
+                    <img src="{personalized_open_url}" width="1" height="1" style="display:none;">
                   </body>
                 </html>
                 '''
                 
-                send_email(sender, password, email, email_subject, html_content, image_path)
+                send_email(sender, password, email, email_subject, html_content_with_email, image_path)
                 print(f"Email enviado a: {email} - Asunto: {email_subject}")
                 successful_sends += 1
             except Exception as e:
@@ -188,24 +199,28 @@ def get_latest_image():
         )
         
         cursor = connection.cursor(dictionary=True)
-        cursor.execute("SELECT id, filename FROM email_images ORDER BY created_at DESC LIMIT 1")
+        cursor.execute("SELECT id, filename, link_redirection FROM email_images ORDER BY created_at DESC LIMIT 1")
         result = cursor.fetchone()
         
         if result:
+            filename_str = str(result['filename'])
+            image_id_int = int(result['id'])
+            link_redirection_str = str(result['link_redirection']) if result['link_redirection'] is not None else None
+
             # Verificar si existe en public/storage
             public_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                'public', 'storage', 'email_images', result['filename']
+                'public', 'storage', 'email_images', filename_str
             )
             
             # Verificar si existe en storage/app/public
             storage_path = os.path.join(
                 os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
-                'storage', 'app', 'public', 'email_images', result['filename']
+                'storage', 'app', 'public', 'email_images', filename_str
             )
             
             # Comprobar cuál existe y devolverlo
-            image_info = {'id': result['id']}
+            image_info = {'id': image_id_int, 'link_redirection': link_redirection_str}
             
             if os.path.exists(public_path):
                 print(f"Usando imagen desde public/storage: {public_path}")
@@ -216,7 +231,7 @@ def get_latest_image():
                 image_info['path'] = storage_path
                 return image_info
             else:
-                print(f"Error: La imagen {result['filename']} no se encontró en ninguna ubicación")
+                print(f"Error: La imagen {filename_str} no se encontró en ninguna ubicación")
                 print(f"Rutas verificadas:")
                 print(f"  - {public_path}")
                 print(f"  - {storage_path}")

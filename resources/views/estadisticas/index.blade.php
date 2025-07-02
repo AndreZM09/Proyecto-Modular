@@ -4,7 +4,7 @@
 <div class="container mt-4">
     <h1 class="text-center">📊 Estadísticas</h1>
     
-    <p class="text-center">Total de registros en la tabla <strong>clicks</strong>: <span class="badge bg-primary">{{ $clicksCount }}</span></p>
+    <p class="text-center">Total de correos rastreados (envíos): <span class="badge bg-primary">{{ $totalEmailsSent }}</span></p>
 
     <div class="row">
         <div class="col-md-6">
@@ -13,9 +13,9 @@
                 <div class="chart-wrapper double-value">
                     <canvas id="openedChart"></canvas>
                     <div class="chart-center-text">
-                        <span class="chart-center-main">{{ $opened }}</span>
+                        <span class="chart-center-main">{{ $totalEmailsOpened }}</span>
                         <span class="chart-center-label">Abiertos</span>
-                        <span class="chart-center-secondary">{{ $notOpened }}</span>
+                        <span class="chart-center-secondary">{{ $totalEmailsSent - $totalEmailsOpened }}</span>
                         <span class="chart-center-label">No Abiertos</span>
                     </div>
                 </div>
@@ -50,7 +50,7 @@
                 <div class="chart-wrapper">
                     <canvas id="clickedChart"></canvas>
                     <div class="chart-center-text">
-                        <span class="chart-center-main">{{ $clicksCount }}</span>
+                        <span class="chart-center-main">{{ $totalClicks }}</span>
                         <span class="chart-center-label">Personas</span>
                     </div>
                 </div>
@@ -62,7 +62,7 @@
                 <div class="chart-wrapper">
                     <canvas id="notClickedChart"></canvas>
                     <div class="chart-center-text">
-                        <span class="chart-center-main">{{ $totalEmails - $clicksCount }}</span>
+                        <span class="chart-center-main">{{ $totalEmailsSent - $totalClicks }}</span>
                         <span class="chart-center-label">Personas</span>
                     </div>
                 </div>
@@ -74,7 +74,7 @@
                 <div class="chart-wrapper">
                     <canvas id="receivedChart"></canvas>
                     <div class="chart-center-text">
-                        <span class="chart-center-main">{{ $totalEmails }}</span>
+                        <span class="chart-center-main">{{ $totalEmailsSent }}</span>
                         <span class="chart-center-label">Personas</span>
                     </div>
                 </div>
@@ -108,7 +108,7 @@
         data: {
             labels: ['Abiertos', 'No Abiertos'],
             datasets: [{
-                data: [{{ $opened }}, {{ $notOpened }}],
+                data: [{{ $totalEmailsOpened }}, {{ $totalEmailsSent - $totalEmailsOpened }}],
                 backgroundColor: ['#28a745', '#dc3545'],
                 borderWidth: 0
             }]
@@ -168,7 +168,7 @@
         type: 'doughnut',
         data: {
             datasets: [{
-                data: [{{ $clicksCount }}, {{ $clicksCount * 0.3 }}],
+                data: [{{ $totalClicks }}, {{ $totalEmailsSent - $totalClicks }}],
                 backgroundColor: ['#28a745', '#f0f0f0'],
                 borderWidth: 0
             }]
@@ -182,7 +182,7 @@
         type: 'doughnut',
         data: {
             datasets: [{
-                data: [{{ $totalEmails - $clicksCount }}, {{ ($totalEmails - $clicksCount) * 0.3 }}],
+                data: [{{ $totalEmailsSent - $totalClicks }}, {{ $totalClicks }}],
                 backgroundColor: ['#dc3545', '#f0f0f0'],
                 borderWidth: 0
             }]
@@ -196,7 +196,7 @@
         type: 'doughnut',
         data: {
             datasets: [{
-                data: [{{ $totalEmails }}, {{ $totalEmails * 0.3 }}],
+                data: [{{ $totalEmailsSent }}, 0],
                 backgroundColor: ['#ffc107', '#f0f0f0'],
                 borderWidth: 0
             }]
