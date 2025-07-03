@@ -137,6 +137,11 @@
                                             <i class="bi bi-lightbulb"></i>
                                             Solo debe contener correos electrónicos
                                         </div>
+                                        <div class="mt-2">
+                                            <a href="{{ asset('ejemplos/formato_ejemplo.xlsx') }}" download class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-download"></i> Descargar formato de ejemplo (Excel)
+                                            </a>
+                                        </div>
                                     </div>
 
                                     <div class="mb-3">
@@ -208,11 +213,10 @@
                                             <i class="bi bi-lightbulb"></i>
                                             Debe contener: correo, asunto, mensaje, prioridad
                                         </div>
-                                        <div id="previewInfoPersonalizado" class="mt-3" style="display: none;">
-                                            <div class="alert alert-info">
-                                                <h6><i class="bi bi-info-circle"></i> Información del archivo</h6>
-                                                <p><strong>Total de correos:</strong> <span id="totalEmailsPersonalizado">0</span></p>
-                                            </div>
+                                        <div class="mt-2">
+                                            <a href="{{ asset('ejemplos/formato_ejemplo.csv') }}" download class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-download"></i> Descargar formato de ejemplo (CSV)
+                                            </a>
                                         </div>
                                     </div>
                                 </div>
