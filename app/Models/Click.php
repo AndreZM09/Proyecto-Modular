@@ -24,12 +24,16 @@ class Click extends Model
         'id_img',
         'id_person',
         'email_sent_at',
+        'email_opened_at',
+        'clicked_at',
         'created_at'
     ];
 
     protected $casts = [
         'created_at' => 'datetime',
-        'email_sent_at' => 'datetime'
+        'email_sent_at' => 'datetime',
+        'email_opened_at' => 'datetime',
+        'clicked_at' => 'datetime'
     ];
 
     /**

@@ -61,8 +61,8 @@ def main():
         image_id = image_info['id']
         image_link_redirection = image_info['link_redirection']
 
-        click_url = f"{base_url}/clicks/track/{image_id}/{{email}}"
-        open_url = f"{base_url}/emails/open/{image_id}/{{email}}"
+        click_url = f"{base_url}/clicks/track/{image_id}/" + "{email}"
+        open_url = f"{base_url}/emails/open/{image_id}/" + "{email}"
 
         if not os.path.exists(image_path):
             print("ERROR: La imagen no existe en la ruta especificada")
@@ -155,11 +155,11 @@ def main():
                 email_description = recipient_data['description']
                 
                 # Construir URLs de seguimiento con el email del destinatario
-                personalized_click_url = click_url.replace('{{email}}', email)
-                personalized_open_url = open_url.replace('{{email}}', email)
+                personalized_click_url = click_url.replace('{email}', email)
+                personalized_open_url = open_url.replace('{email}', email)
 
-                # Determinar la URL de redirección final para el clic
-                final_redirect_url = image_link_redirection if image_link_redirection else personalized_click_url
+                # SIEMPRE usar el enlace de tracking, no el link_redirection directo
+                final_redirect_url = personalized_click_url
 
                 html_content_with_email = f'''
                 <html>
