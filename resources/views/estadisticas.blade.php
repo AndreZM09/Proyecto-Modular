@@ -40,11 +40,163 @@
             color: #6c757d;
         }
     </style>
+    <style>
+        /* Estilos para el botón flotante y el chat */
+        .chatbot-fab {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            width: 60px;
+            height: 60px;
+            background-color: #007bff; /* Color de botón flotante */
+            color: white;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 1.8rem;
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+            cursor: pointer;
+            z-index: 1000;
+            transition: all 0.3s ease;
+        }
+        .chatbot-fab:hover {
+            background-color: #0056b3;
+            transform: scale(1.05);
+        }
+        .chatbot-container {
+            position: fixed;
+            bottom: 90px; /* Arriba del FAB */
+            right: 20px;
+            width: 350px; /* Ancho del chat */
+            height: 450px; /* Alto del chat */
+            background-color: #ffffff;
+            border-radius: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.25);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            z-index: 999;
+            transform: translateY(20px);
+            opacity: 0;
+            visibility: hidden;
+            transition: all 0.3s ease-in-out;
+        }
+        .chatbot-container.active {
+            transform: translateY(0);
+            opacity: 1;
+            visibility: visible;
+        }
+        .chatbot-header {
+            background-color: #007bff;
+            color: white;
+            padding: 15px;
+            font-size: 1.1em;
+            font-weight: bold;
+            border-top-left-radius: 12px;
+            border-top-right-radius: 12px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+        }
+        .chatbot-header .close-btn {
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5em;
+            cursor: pointer;
+        }
+        .chatbot-body {
+            flex-grow: 1;
+            padding: 15px;
+            overflow-y: auto;
+            background-color: #f8f9fa;
+            border-bottom: 1px solid #e9ecef;
+        }
+        .chatbot-message {
+            margin-bottom: 10px;
+            padding: 10px;
+            border-radius: 8px;
+            max-width: 80%;
+            line-height: 1.4;
+        }
+        .chatbot-message.user {
+            background-color: #e2f2ff; /* Light blue */
+            margin-left: auto;
+            text-align: right;
+        }
+        .chatbot-message.ai {
+            background-color: #e9ecef; /* Light gray */
+            margin-right: auto;
+            text-align: left;
+        }
+        .chatbot-message.ai.error {
+            background-color: #f8d7da; /* Light red */
+            color: #721c24;
+        }
+        .chatbot-input-area {
+            padding: 15px;
+            display: flex;
+            border-top: 1px solid #dee2e6;
+            background-color: #ffffff;
+        }
+        .chatbot-input-area textarea {
+            flex-grow: 1;
+            border: 1px solid #ced4da;
+            border-radius: 8px;
+            padding: 8px;
+            margin-right: 10px;
+            resize: none; /* Deshabilitar redimensionamiento manual */
+            overflow: hidden; /* Ocultar barras de desplazamiento */
+        }
+        .chatbot-input-area button {
+            background-color: #28a745; /* Green send button */
+            color: white;
+            border: none;
+            border-radius: 8px;
+            padding: 8px 15px;
+            cursor: pointer;
+            transition: background-color 0.2s ease;
+        }
+        .chatbot-input-area button:hover {
+            background-color: #218838;
+        }
+        .chatbot-input-area button:disabled {
+            background-color: #90ee90;
+            cursor: not-allowed;
+        }
+        .chatbot-spinner {
+            border: 3px solid rgba(255, 255, 255, 0.3);
+            border-top-color: #fff;
+            border-radius: 50%;
+            width: 20px;
+            height: 20px;
+            animation: spin 1s linear infinite;
+            margin-left: 10px;
+        }
+        /* Media queries para responsividad */
+        @media (max-width: 768px) {
+            .chatbot-container {
+                width: 90%;
+                right: 5%;
+                bottom: 90px;
+                height: 70vh; /* Ocupa más alto en móviles */
+            }
+            .chatbot-fab {
+                width: 50px;
+                height: 50px;
+                font-size: 1.5rem;
+                bottom: 15px;
+                right: 15px;
+            }
+        }
+    </style>
 </head>
-
+    
 <body class="estadisticas-page">
     @include('layouts.navbar')
 
+    <!-- Contenido existente de la página -->
     <div class="container mt-4">
         @if(isset($campaignTitle))
             <div class="d-flex justify-content-between align-items-center mb-4">
@@ -244,8 +396,8 @@
                                         @endif
                                     </td>
                                     <td>
-                                        @if($email->created_at && $email->ip_address)
-                                            {{ $email->created_at->format('d/m/Y H:i') }}
+                                        @if($email->clicked_at)
+                                            Clic realizado ({{ $email->clicked_at->format('d/m/Y H:i') }})
                                         @else
                                             N/A
                                         @endif
@@ -262,15 +414,40 @@
             </div>
         </div>
     </div>
+    
+    <!-- Botón flotante para abrir el chat de la IA -->
+    <div class="chatbot-fab" id="openChatBtn">
+        <i class="bi bi-chat-dots-fill"></i>
+    </div>
+
+    <!-- Contenedor del Chatbot (inicialmente oculto) -->
+    <div class="chatbot-container" id="chatbotContainer">
+        <div class="chatbot-header">
+            <span>Agente IA</span>
+            <button class="close-btn" id="closeChatBtn">&times;</button>
+        </div>
+        <div class="chatbot-body" id="chatbox">
+            <!-- Mensajes del chat aquí -->
+            <div class="chatbot-message ai">
+                ¡Hola! Soy tu asistente IA para campañas. Pregúntame sobre tus estadísticas.
+            </div>
+        </div>
+        <div class="chatbot-input-area">
+            <textarea id="aiQuestionInput" placeholder="Escribe tu pregunta..." rows="1"></textarea>
+            <button id="askAiBtn">
+                <span id="spinner" class="spinner-border spinner-border-sm hidden" role="status" aria-hidden="true"></span>
+                Enviar
+            </button>
+        </div>
+    </div>
 
     <script>
-        // Configuración común para gráficas
+        // Lógica de los gráficos (ya existente)
         const commonChartOptions = {
             cutout: '75%',
             plugins: { legend: { display: true, position: 'bottom' } }
         };
 
-        // Gráfica de emails abiertos
         new Chart(document.getElementById('openedChart').getContext('2d'), {
             type: 'doughnut',
             data: {
@@ -283,7 +460,6 @@
             options: commonChartOptions
         });
 
-        // Gráfica de clics realizados
         new Chart(document.getElementById('clickedChart').getContext('2d'), {
             type: 'doughnut',
             data: {
@@ -295,8 +471,77 @@
             },
             options: commonChartOptions
         });
-    </script>
 
+        // Lógica del Agente IA Chatbot
+        const openChatBtn = document.getElementById('openChatBtn');
+        const closeChatBtn = document.getElementById('closeChatBtn');
+        const chatbotContainer = document.getElementById('chatbotContainer');
+        const aiQuestionInput = document.getElementById('aiQuestionInput');
+        const askAiBtn = document.getElementById('askAiBtn');
+        const spinner = document.getElementById('spinner');
+        const chatbox = document.getElementById('chatbox');
+
+        openChatBtn.addEventListener('click', () => {
+            chatbotContainer.classList.add('active');
+        });
+
+        closeChatBtn.addEventListener('click', () => {
+            chatbotContainer.classList.remove('active');
+        });
+
+        // Auto-redimensionar el textarea
+        aiQuestionInput.addEventListener('input', () => {
+            aiQuestionInput.style.height = 'auto';
+            aiQuestionInput.style.height = (aiQuestionInput.scrollHeight) + 'px';
+        });
+
+        askAiBtn.addEventListener('click', async () => {
+            const question = aiQuestionInput.value.trim();
+            if (!question) return;
+
+            // Añadir pregunta del usuario al chat
+            addMessage(question, 'user');
+            aiQuestionInput.value = '';
+            aiQuestionInput.style.height = 'auto'; // Reset height
+
+            askAiBtn.disabled = true;
+            spinner.classList.remove('hidden');
+
+            try {
+                const response = await fetch('/api/ask-ai', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                const data = await response.json();
+
+                if (data.success) {
+                    addMessage(data.response, 'ai');
+                } else {
+                    addMessage('Error: ' + (data.message || 'No se pudo obtener una respuesta válida.'), 'ai error');
+                    console.error('Error AI Response:', data.error); // Log detailed error
+                }
+            } catch (error) {
+                console.error('Error al comunicarse con la IA:', error);
+                addMessage('Lo siento, no pude conectar con la IA. Por favor, verifica tu conexión o la configuración.', 'ai error');
+            } finally {
+                askAiBtn.disabled = false;
+                spinner.classList.add('hidden');
+                chatbox.scrollTop = chatbox.scrollHeight; // Scroll al final del chat
+            }
+        });
+
+        function addMessage(text, sender) {
+            const messageDiv = document.createElement('div');
+            messageDiv.classList.add('chatbot-message', sender);
+            messageDiv.textContent = text;
+            chatbox.appendChild(messageDiv);
+            chatbox.scrollTop = chatbox.scrollHeight; // Auto-scroll
+        }
+    </script>
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
 </body>
 </html>

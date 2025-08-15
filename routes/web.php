@@ -60,3 +60,12 @@ Route::get('/emails/open/{id_img}/{email}', [EstadisticasController::class, 'tra
 
 // Ruta de prueba
 Route::get('/test-click', [TestController::class, 'testClick']);
+
+// Rutas para la IA y estadísticas de campañas
+Route::get('/api/campaign-performance', [App\Http\Controllers\EstadisticasController::class, 'getCampaignPerformance']);
+Route::get('/api/campaign-predictions', [App\Http\Controllers\EstadisticasController::class, 'predictCampaignPerformance']);
+Route::post('/api/ask-ai', [App\Http\Controllers\EstadisticasController::class, 'askAIAboutCampaigns']);
+
+Route::get('/ai-predictions', function () {
+    return view('ai_predictions');
+})->name('ai.predictions');

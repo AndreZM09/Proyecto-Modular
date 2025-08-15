@@ -9,6 +9,7 @@ use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
 use Stevebauman\Location\Facades\Location;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Http;
 
 class EstadisticasController extends Controller
 {
@@ -433,10 +434,13 @@ class EstadisticasController extends Controller
         $emailList = [];
         if ($currentImage) {
             $emailList = Click::where('id_img', $currentImage->id)
-                ->select('email', 'email_sent_at', 'ip_address', 'created_at')
+                ->select('email', 'email_sent_at', 'ip_address', 'created_at', 'email_opened_at', 'clicked_at')
                 ->orderBy('email_sent_at', 'desc')
                 ->get();
         }
+
+        // Log para depuración: verificar el contenido de $emailList en showEstadisticas:
+        \Illuminate\Support\Facades\Log::info('Contenido de $emailList en showEstadisticas:', $emailList->toArray());
 
         return view('estadisticas', compact(
             'clicksCount',
@@ -1113,6 +1117,195 @@ class EstadisticasController extends Controller
             return response()->json([
                 'success' => false,
                 'message' => 'Error al procesar el archivo: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getCampaignPerformance()
+    {
+        try {
+            $campaigns = EmailImage::with('clicks')->get();
+
+            $performanceData = [];
+            foreach ($campaigns as $campaign) {
+                $totalSent = $campaign->clicks->count();
+                $totalOpened = $campaign->clicks->whereNotNull('email_opened_at')->count();
+                $totalClicked = $campaign->clicks->whereNotNull('clicked_at')->count();
+
+                $openRate = $totalSent > 0 ? ($totalOpened / $totalSent) * 100 : 0;
+                $clickRate = $totalOpened > 0 ? ($totalClicked / $totalOpened) * 100 : 0; // Click rate of opened emails
+
+                $performanceData[] = [
+                    'campaign_id' => $campaign->id,
+                    'subject' => $campaign->subject,
+                    'description' => $campaign->description,
+                    'priority' => $campaign->priority,
+                    'link_redirection' => $campaign->link_redirection,
+                    'created_at' => $campaign->created_at->format('Y-m-d H:i:s'),
+                    'total_sent' => $totalSent,
+                    'total_opened' => $totalOpened,
+                    'total_clicked' => $totalClicked,
+                    'open_rate' => round($openRate, 2),
+                    'click_rate' => round($clickRate, 2),
+                ];
+            }
+
+            return response()->json([
+                'success' => true,
+                'data' => $performanceData
+            ]);
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener el rendimiento de las campañas: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function predictCampaignPerformance(Request $request)
+    {
+        try {
+            // 1. Obtener datos históricos de las campañas
+            $campaignPerformanceResponse = $this->getCampaignPerformance();
+            $campaignPerformanceData = json_decode($campaignPerformanceResponse->getContent(), true)['data'];
+
+            if (empty($campaignPerformanceData)) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hay datos históricos de campañas para realizar predicciones.'
+                ], 400);
+            }
+
+            // 2. Construir el prompt para la IA
+            $prompt = "A continuación, se presentan datos históricos de campañas de marketing por correo electrónico con sus métricas de rendimiento (total enviados, abiertos, clics, tasa de apertura, tasa de clic). Basándose en estos datos, predice qué tan eficiente será una NUEVA campaña. También proporciona ideas adicionales y consejos relevantes para mejorar el rendimiento de futuras campañas. Describe tus predicciones y consejos en un formato claro y conciso, idealmente con viñetas o un pequeño párrafo para cada recomendación.\n\n";
+
+            foreach ($campaignPerformanceData as $campaign) {
+                $prompt .= "Campaña ID: {$campaign['campaign_id']}\n";
+                $prompt .= "  Asunto: \"{$campaign['subject']}\"\n";
+                $prompt .= "  Descripción: \"{$campaign['description']}\"\n";
+                $prompt .= "  Link: {$campaign['link_redirection']}\n";
+                $prompt .= "  Enviados: {$campaign['total_sent']}\n";
+                $prompt .= "  Abiertos: {$campaign['total_opened']}\n";
+                $prompt .= "  Clics: {$campaign['total_clicked']}\n";
+                $prompt .= "  Tasa de Apertura: {$campaign['open_rate']}%\n";
+                $prompt .= "  Tasa de Clic: {$campaign['click_rate']}%\n\n";
+            }
+
+            $prompt .= "Predicciones y Recomendaciones para FUTURAS campañas:\n";
+
+            // 3. Realizar la solicitud a la API de OpenAI
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
+                'Content-Type' => 'application/json',
+            ])->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-3.5-turbo', // Puedes cambiar a 'gpt-4' si tienes acceso y lo prefieres
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Eres un experto en marketing digital y análisis de campañas de correo electrónico.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'max_tokens' => 500, // Ajusta esto según la longitud deseada de la respuesta
+                'temperature' => 0.7, // Ajusta la creatividad de la respuesta (0.0-1.0)
+            ]);
+
+            $aiResponse = $response->json();
+
+            if (isset($aiResponse['choices'][0]['message']['content'])) {
+                return response()->json([
+                    'success' => true,
+                    'predictions_and_recommendations' => $aiResponse['choices'][0]['message']['content']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo obtener una respuesta válida de la IA.',
+                    'error' => $aiResponse
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al comunicarse con la IA: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function askAIAboutCampaigns(Request $request)
+    {
+        try {
+            $request->validate([
+                'question' => 'required|string|max:1000'
+            ]);
+
+            $userQuestion = $request->input('question');
+
+            // Obtener datos históricos de las campañas (reutilizando la lógica existente)
+            $campaignPerformanceResponse = $this->getCampaignPerformance();
+            $campaignPerformanceData = json_decode($campaignPerformanceResponse->getContent(), true)['data'];
+
+            $contextData = "";
+            if (!empty($campaignPerformanceData)) {
+                $contextData .= "Aquí están los datos históricos de mis campañas de email marketing:\n\n";
+                foreach ($campaignPerformanceData as $campaign) {
+                    // Ensure to report what data is actually available.
+                    // If 'email_opened_at' and 'clicked_at' are consistently NULL,
+                    // then open_rate and click_rate will be 0.
+                    $contextData .= "Campaña ID: {$campaign['campaign_id']}\n";
+                    $contextData .= "  Asunto: \"{$campaign['subject']}\"\n";
+                    $contextData .= "  Descripción: \"{$campaign['description']}\"\n";
+                    $contextData .= "  Enviados: {$campaign['total_sent']}\n";
+                    $contextData .= "  Abiertos: {$campaign['total_opened']}\n";
+                    $contextData .= "  Clics: {$campaign['total_clicked']}\n";
+                    $contextData .= "  Tasa de Apertura: {$campaign['open_rate']}%\n";
+                    $contextData .= "  Tasa de Clic (de abiertos): {$campaign['click_rate']}%\n\n";
+                }
+                $contextData .= "Basándote en estos datos, responde a la siguiente pregunta: \n";
+            } else {
+                $contextData .= "No hay datos históricos de campañas disponibles. Solo tengo información general. Por favor, ten esto en cuenta al responder.\n\n";
+            }
+
+            $prompt = $contextData . $userQuestion;
+
+            \Log::info('AI Agent Request Prompt:', ['prompt' => $prompt]); // Log the prompt
+
+            // Realizar la solicitud a la API de OpenAI
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
+                'Content-Type' => 'application/json',
+            ])->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-3.5-turbo', // O 'gpt-4' si tienes acceso y lo prefieres
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Eres un asistente de marketing digital experto en analizar el rendimiento de campañas de email y proporcionar información útil, predicciones y recomendaciones basadas en los datos proporcionados. Siempre responde en español de manera clara y concisa. Si no tienes suficientes datos para una predicción específica, dilo claramente.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'max_tokens' => 700, // Aumentado para respuestas más detalladas
+                'temperature' => 0.7, 
+            ]);
+
+            $aiResponse = $response->json();
+            \Log::info('AI Agent Response (Raw):', ['response' => $aiResponse]); // Log raw AI response
+
+            if (isset($aiResponse['choices'][0]['message']['content'])) {
+                return response()->json([
+                    'success' => true,
+                    'response' => $aiResponse['choices'][0]['message']['content']
+                ]);
+            } else {
+                // Log the error response from OpenAI if content is missing
+                \Log::error('AI Agent: No content in OpenAI response.', ['raw_response' => $aiResponse]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo obtener una respuesta válida de la IA. Por favor, verifica los logs para más detalles.',
+                    'error' => $aiResponse // Include the full response for client-side debugging if needed
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('AI Agent Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al comunicarse con la IA: ' . $e->getMessage()
             ], 500);
         }
     }

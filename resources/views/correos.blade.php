@@ -132,14 +132,14 @@
                                             <i class="bi bi-file-earmark-text"></i>
                                             Archivo de Correos
                                         </label>
-                                        <input type="file" name="emailFile" id="emailFileMasivo" class="form-control" accept=".txt,.csv,.xlsx,.xls" required>
+                                        <input type="file" name="emailFile" id="emailFileMasivo" class="form-control" accept=".txt,.csv" required>
                                         <div class="form-text">
                                             <i class="bi bi-lightbulb"></i>
                                             Solo debe contener correos electrónicos
                                         </div>
                                         <div class="mt-2">
-                                            <a href="{{ asset('ejemplos/formato_ejemplo.xlsx') }}" download class="btn btn-outline-primary btn-sm">
-                                                <i class="bi bi-download"></i> Descargar formato de ejemplo (Excel)
+                                            <a href="{{ asset('ejemplos/formato_ejemplo.csv') }}" download class="btn btn-outline-primary btn-sm">
+                                                <i class="bi bi-download"></i> Descargar formato de ejemplo (CSV)
                                             </a>
                                         </div>
                                     </div>
