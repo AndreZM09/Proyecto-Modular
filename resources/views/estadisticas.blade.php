@@ -217,11 +217,11 @@
         <div class="row mt-4">
             <div class="col-md-4">
                 <div class="chart-container">
-                    <h3>Correos Enviados</h3>
+                    <h3>Correos Abiertos</h3>
                     <div class="chart-wrapper">
                         <div class="chart-center-text">
-                            <span class="chart-center-main">{{ $emailsSent }}</span>
-                            <span class="chart-center-label">Enviados</span>
+                            <span class="chart-center-main">{{ $opened }}</span>
+                            <span class="chart-center-label">Abiertos</span>
                         </div>
                     </div>
                 </div>
@@ -229,12 +229,12 @@
             
             <div class="col-md-4">
                 <div class="chart-container">
-                    <h3>Correos Abiertos</h3>
+                    <h3>Correos Enviados</h3>
                     <div class="chart-wrapper">
-                        <canvas id="openedChart"></canvas>
+                        <canvas id="sentChart"></canvas>
                         <div class="chart-center-text">
-                            <span class="chart-center-main">{{ $opened }}</span>
-                            <span class="chart-center-label">Abiertos</span>
+                            <span class="chart-center-main">{{ $emailsSent }}</span>
+                            <span class="chart-center-label">Enviados</span>
                         </div>
                     </div>
                 </div>
@@ -448,12 +448,12 @@
             plugins: { legend: { display: true, position: 'bottom' } }
         };
 
-        new Chart(document.getElementById('openedChart').getContext('2d'), {
+        new Chart(document.getElementById('sentChart').getContext('2d'), {
             type: 'doughnut',
             data: {
-                labels: ['Abiertos', 'No Abiertos'],
+                labels: ['Enviados', 'No Enviados'],
                 datasets: [{
-                    data: [{{ $opened }}, {{ ($emailsSent > $opened) ? ($emailsSent - $opened) : 0 }}],
+                    data: [{{ $emailsSent }}, {{ max(0, 100 - $emailsSent) }}],
                     backgroundColor: ['#28a745', '#f0f0f0']
                 }]
             },
