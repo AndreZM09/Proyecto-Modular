@@ -389,7 +389,7 @@
                                     <td>{{ $email->email }}</td>
                                     <td>{{ $email->email_sent_at ? $email->email_sent_at->format('d/m/Y H:i') : 'N/A' }}</td>
                                     <td>
-                                        @if($email->ip_address)
+                                        @if($email->clicked_at)
                                             <span class="badge bg-success">Clic realizado</span>
                                         @else
                                             <span class="badge bg-secondary">Sin interacción</span>

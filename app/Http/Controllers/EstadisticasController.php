@@ -481,9 +481,9 @@ class EstadisticasController extends Controller
                       ->whereNotNull('email_opened_at')
                       ->count();
 
-        // Obtener la lista de correos enviados para esta campaña
+        // Obtener la lista de correos enviados para esta campaña (incluye clicked_at para mostrar interacción)
         $emailList = Click::where('id_img', $id)
-            ->select('email', 'email_sent_at', 'ip_address', 'created_at')
+            ->select('email', 'email_sent_at', 'clicked_at')
             ->orderBy('email_sent_at', 'desc')
             ->get();
         
