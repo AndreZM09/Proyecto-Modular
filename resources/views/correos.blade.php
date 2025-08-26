@@ -91,167 +91,69 @@
             </div>
         </div>
 
-        <!-- Envío de Correos Masivos -->
+        <!-- Envío Personalizado -->
         <div class="card">
             <div class="card-header">
                 <i class="bi bi-send-plus"></i>
-                Envío de Correos Masivos
+                Envío Personalizado
             </div>
             <div class="card-body">
-                <!-- Nav tabs -->
-                <ul class="nav nav-tabs mb-4" id="emailTabs" role="tablist">
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link active" id="masivo-tab" data-bs-toggle="tab" data-bs-target="#masivo" type="button" role="tab">
-                            <i class="bi bi-envelope-fill"></i>
-                            Envío Masivo
-                        </button>
-                    </li>
-                    <li class="nav-item" role="presentation">
-                        <button class="nav-link" id="personalizado-tab" data-bs-toggle="tab" data-bs-target="#personalizado" type="button" role="tab">
-                            <i class="bi bi-person-lines-fill"></i>
-                            Envío Personalizado
-                        </button>
-                    </li>
-                </ul>
-
-                <!-- Tab content -->
-                <div class="tab-content" id="emailTabContent">
-                    <!-- Envío Masivo Tab -->
-                    <div class="tab-pane fade show active" id="masivo" role="tabpanel">
-                        <form id="emailFormMasivo" method="POST" action="{{ route('estadisticas.send-bulk-email') }}" enctype="multipart/form-data">
-                            @csrf
-                            <div class="alert alert-info border-0 mb-4" style="background: linear-gradient(135deg, #e8f4fd 0%, #d1ecf1 100%); border-radius: 12px;">
-                                <i class="bi bi-info-circle"></i>
-                                <strong>Envío Masivo:</strong> Sube un archivo con solo correos electrónicos y define manualmente el asunto y mensaje que se enviará a todos.
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="emailFileMasivo" class="form-label">
-                                            <i class="bi bi-file-earmark-text"></i>
-                                            Archivo de Correos
-                                        </label>
-                                        <input type="file" name="emailFile" id="emailFileMasivo" class="form-control" accept=".txt,.csv" required>
-                                        <div class="form-text">
-                                            <i class="bi bi-lightbulb"></i>
-                                            Solo debe contener correos electrónicos
-                                        </div>
-                                        <div class="mt-2">
-                                            <a href="{{ asset('ejemplos/formato_ejemplo.csv') }}" download class="btn btn-outline-primary btn-sm">
-                                                <i class="bi bi-download"></i> Descargar formato de ejemplo (CSV)
-                                            </a>
-                                        </div>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="subjectMasivo" class="form-label">
-                                            <i class="bi bi-tag"></i>
-                                            Asunto del Correo
-                                        </label>
-                                        <input type="text" name="subject" id="subjectMasivo" class="form-control" placeholder="Escribe el asunto que se enviará a todos" required>
-                                    </div>
-
-                                    <div class="mb-3">
-                                        <label for="descriptionMasivo" class="form-label">
-                                            <i class="bi bi-chat-text"></i>
-                                            Mensaje del Correo
-                                        </label>
-                                        <textarea name="description" id="descriptionMasivo" class="form-control" rows="4" placeholder="Escribe el mensaje que se enviará a todos" required></textarea>
-                                    </div>
-                                </div>
-                                <div class="col-md-6">
-                                    <div class="imagen-actual-container">
-                                        <label class="form-label d-block">
-                                            <i class="bi bi-image-alt"></i>
-                                            Imagen Actual de Campaña
-                                        </label>
-                                        @if($currentImage ?? null)
-                                            <a href="{{ route('clicks.track', ['id_img' => $currentImage->id, 'email' => 'RECIPIENT_EMAIL']) }}" target="_blank">
-                                                <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}"
-                                                     alt="Imagen actual" class="img-fluid">
-                                            </a>
-                                            <p class="mt-2 mb-0 text-muted small">{{ $currentImage->subject ?? 'Sin título' }}</p>
-                                        @else
-                                            <div class="text-muted">
-                                                <i class="bi bi-exclamation-triangle" style="font-size: 2rem; color: #ffc107;"></i>
-                                                <p class="mt-2 mb-0">No hay imagen configurada</p>
-                                                <small>Configure una imagen primero</small>
-                                            </div>
-                                        @endif
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div class="d-flex gap-3">
-                                <button type="submit" class="btn btn-primary" id="submitBtnMasivo" disabled>
-                                    <i class="bi bi-rocket-takeoff"></i>
-                                    Enviar Campaña
-                                </button>
-                            </div>
-                        </form>
+                <form id="emailFormPersonalizado" method="POST" action="{{ route('estadisticas.upload-email-list') }}" enctype="multipart/form-data">
+                    @csrf
+                    <div class="alert alert-success border-0 mb-4" style="background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%); border-radius: 12px;">
+                        <i class="bi bi-person-check"></i>
+                        <strong>Envío Personalizado:</strong> Sube un archivo Excel con correos, asuntos, mensajes y prioridades individuales para cada destinatario.
                     </div>
 
-                    <!-- Envío Personalizado Tab -->
-                    <div class="tab-pane fade" id="personalizado" role="tabpanel">
-                        <form id="emailFormPersonalizado" method="POST" action="{{ route('estadisticas.upload-email-list') }}" enctype="multipart/form-data">
-                            @csrf
-                            <div class="alert alert-success border-0 mb-4" style="background: linear-gradient(135deg, #e8f5e8 0%, #d4edda 100%); border-radius: 12px;">
-                                <i class="bi bi-person-check"></i>
-                                <strong>Envío Personalizado:</strong> Sube un archivo Excel con correos, asuntos, mensajes y prioridades individuales para cada destinatario.
-                            </div>
-
-                            <div class="row">
-                                <div class="col-md-6">
-                                    <div class="mb-3">
-                                        <label for="emailFilePersonalizado" class="form-label">
-                                            <i class="bi bi-file-earmark-excel"></i>
-                                            Archivo Excel Personalizado
-                                        </label>
-                                        <input type="file" name="emailFile" id="emailFilePersonalizado" class="form-control" accept=".xlsx,.xls,.csv" required>
-                                        <div class="form-text">
-                                            <i class="bi bi-lightbulb"></i>
-                                            Debe contener: correo, asunto, mensaje, prioridad
-                                        </div>
-                                        <div class="mt-2">
-                                            <a href="{{ asset('ejemplos/formato_ejemplo.csv') }}" download class="btn btn-outline-primary btn-sm">
-                                                <i class="bi bi-download"></i> Descargar formato de ejemplo (CSV)
-                                            </a>
-                                        </div>
-                                    </div>
+                    <div class="row">
+                        <div class="col-md-6">
+                            <div class="mb-3">
+                                <label for="emailFilePersonalizado" class="form-label">
+                                    <i class="bi bi-file-earmark-excel"></i>
+                                    Archivo Excel Personalizado
+                                </label>
+                                <input type="file" name="emailFile" id="emailFilePersonalizado" class="form-control" accept=".xlsx,.xls,.csv" required>
+                                <div class="form-text">
+                                    <i class="bi bi-lightbulb"></i>
+                                    Debe contener: correo, asunto, mensaje, prioridad
                                 </div>
-                                <div class="col-md-6">
-                                    <div class="imagen-actual-container">
-                                        <label class="form-label d-block">
-                                            <i class="bi bi-image-alt"></i>
-                                            Imagen Actual de Campaña
-                                        </label>
-                                        @if($currentImage ?? null)
-                                            <a href="{{ route('clicks.track', ['id_img' => $currentImage->id, 'email' => 'RECIPIENT_EMAIL']) }}" target="_blank">
-                                                <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}"
-                                                     alt="Imagen actual" class="img-fluid">
-                                            </a>
-                                            <p class="mt-2 mb-0 text-muted small">{{ $currentImage->subject ?? 'Sin título' }}</p>
-                                        @else
-                                            <div class="text-muted">
-                                                <i class="bi bi-exclamation-triangle" style="font-size: 2rem; color: #ffc107;"></i>
-                                                <p class="mt-2 mb-0">No hay imagen configurada</p>
-                                                <small>Configure una imagen primero</small>
-                                            </div>
-                                        @endif
-                                    </div>
+                                <div class="mt-2">
+                                    <a href="{{ asset('ejemplos/formato_ejemplo.csv') }}" download class="btn btn-outline-primary btn-sm">
+                                        <i class="bi bi-download"></i> Descargar formato de ejemplo (CSV)
+                                    </a>
                                 </div>
                             </div>
-
-                            <div class="d-flex gap-3">
-                                <button type="submit" class="btn btn-primary" id="submitBtnPersonalizado" disabled>
-                                    <i class="bi bi-rocket-takeoff"></i>
-                                    Enviar Campaña
-                                </button>
+                        </div>
+                        <div class="col-md-6">
+                            <div class="imagen-actual-container">
+                                <label class="form-label d-block">
+                                    <i class="bi bi-image-alt"></i>
+                                    Imagen Actual de Campaña
+                                </label>
+                                @if($currentImage ?? null)
+                                    <a href="{{ route('clicks.track', ['id_img' => $currentImage->id, 'email' => 'RECIPIENT_EMAIL']) }}" target="_blank">
+                                        <img src="{{ asset('storage/email_images/' . $currentImage->filename) }}"
+                                             alt="Imagen actual" class="img-fluid">
+                                    </a>
+                                    <p class="mt-2 mb-0 text-muted small">{{ $currentImage->subject ?? 'Sin título' }}</p>
+                                @else
+                                    <div class="text-muted">
+                                        <i class="bi bi-exclamation-triangle" style="font-size: 2rem; color: #ffc107;"></i>
+                                        <p class="mt-2 mb-0">No hay imagen configurada</p>
+                                        <small>Configure una imagen primero</small>
+                                    </div>
+                                @endif
                             </div>
-                        </form>
+                        </div>
                     </div>
-                </div>
+
+                    <div class="d-flex gap-3">
+                        <button type="submit" class="btn btn-primary" id="submitBtnPersonalizado" disabled>
+                            <i class="bi bi-rocket-takeoff"></i>
+                            Enviar Campaña
+                        </button>
+                    </div>
+                </form>
             </div>
         </div>
     </div>
@@ -361,110 +263,7 @@
             });
         });
 
-        // Manejar la subida de archivo en ENVÍO MASIVO
-        document.getElementById('emailFileMasivo').addEventListener('change', function(e) {
-            const file = e.target.files[0];
-            if (!file) return;
-
-            const formData = new FormData();
-            formData.append('emailFile', file);
-
-            // Mostrar indicador de carga
-            showMessage('info', 'Procesando archivo...');
-            
-            // Deshabilitar botón mientras se procesa
-            $('#submitBtnMasivo').prop('disabled', true);
-
-            // Enviar archivo para previsualización
-            $.ajax({
-                url: '{{ route("estadisticas.preview-excel") }}',
-                method: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                headers: {
-                    'X-CSRF-TOKEN': $('meta[name="csrf-token"]').attr('content')
-                },
-                success: function(response) {
-                    if (response.success) {
-                        // Habilitar botón de envío si hay correos válidos
-                        $('#submitBtnMasivo').prop('disabled', response.data.totalEmails === 0);
-                        
-                        if (response.data.totalEmails > 0) {
-                            showMessage('success', `Archivo cargado correctamente. ${response.data.totalEmails} correos encontrados listos para envío masivo.`);
-                        } else {
-                            showMessage('error', 'No se encontraron correos válidos en el archivo.');
-                        }
-                    } else {
-                        $('#submitBtnMasivo').prop('disabled', true);
-                        showMessage('error', response.message || 'Error al cargar el archivo');
-                    }
-                },
-                error: function(xhr) {
-                    let errorMessage = 'Error al cargar el archivo';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        errorMessage = xhr.responseJSON.message;
-                    }
-                    $('#submitBtnMasivo').prop('disabled', true);
-                    showMessage('error', errorMessage);
-                }
-            });
-        });
-
-        // Manejo del formulario de ENVÍO MASIVO
-        document.getElementById('emailFormMasivo').addEventListener('submit', function(e) {
-            e.preventDefault(); // Prevenir envío normal del formulario
-            
-            const btn = this.querySelector('button[type="submit"]');
-            const originalText = btn.innerHTML;
-            
-            // Mostrar estado de carga
-            btn.classList.add('loading');
-            btn.innerHTML = '<i class="bi bi-rocket-takeoff"></i> Enviando...';
-            btn.disabled = true;
-            
-            // Crear FormData para envío de archivos
-            const formData = new FormData(this);
-            // Agregar prioridad por defecto para envío masivo
-            formData.append('priority', 'normal');
-            
-            $.ajax({
-                url: $(this).attr('action'),
-                method: 'POST',
-                data: formData,
-                processData: false,
-                contentType: false,
-                success: function(response) {
-                    // Mostrar mensaje de éxito
-                    showMessage('success', response.message || 'Campaña masiva enviada exitosamente');
-                    
-                    // Resetear formulario
-                    document.getElementById('emailFormMasivo').reset();
-                    
-                    // Opcional: recargar después de 2 segundos para refrescar datos
-                    setTimeout(function() {
-                        window.location.reload();
-                    }, 2000);
-                },
-                error: function(xhr) {
-                    let errorMessage = 'Error al enviar la campaña masiva';
-                    if (xhr.responseJSON && xhr.responseJSON.message) {
-                        errorMessage = xhr.responseJSON.message;
-                    } else if (xhr.responseJSON && xhr.responseJSON.errors) {
-                        // Manejar errores de validación
-                        const errors = Object.values(xhr.responseJSON.errors).flat();
-                        errorMessage = errors.join('<br>');
-                    }
-                    showMessage('error', errorMessage);
-                },
-                complete: function() {
-                    // Restaurar botón
-                    btn.classList.remove('loading');
-                    btn.innerHTML = originalText;
-                    btn.disabled = false;
-                }
-            });
-        });
+        // (Se eliminó la lógica de Envío Masivo)
 
         // Manejar la previsualización del archivo Excel PERSONALIZADO
         document.getElementById('emailFilePersonalizado').addEventListener('change', function(e) {
