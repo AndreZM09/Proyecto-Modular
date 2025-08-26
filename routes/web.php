@@ -59,7 +59,12 @@ Route::get('/clicks/track/{id_img}/{email}', [EstadisticasController::class, 'tr
 Route::get('/emails/open/{id_img}/{email}', [EstadisticasController::class, 'trackOpen'])->name('clicks.open');
 
 // Ruta de prueba
-Route::get('/test-click', [TestController::class, 'testClick']);
+Route::get('/test-click', [TestController::class, 'testClick'])->name('test.click');
+
+// Nuevas rutas para tests de redirección móvil
+Route::get('/test-mobile-redirect', [TestController::class, 'testMobileRedirect']);
+Route::get('/test-redirect/{id_img}/{email}', [TestController::class, 'testRedirectWithParams']);
+Route::get('/test-device-detection', [TestController::class, 'testDeviceDetection']);
 
 // Rutas para la IA y estadísticas de campañas
 Route::get('/api/campaign-performance', [App\Http\Controllers\EstadisticasController::class, 'getCampaignPerformance']);

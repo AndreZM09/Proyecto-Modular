@@ -148,16 +148,21 @@ class EstadisticasController extends Controller
             'email' => $email,
             'raw_url' => request()->url(),
             'full_url' => request()->fullUrl(),
-            'ip_address' => request()->ip()
+            'ip_address' => request()->ip(),
+            'user_agent' => request()->userAgent()
         ]);
 
         $imageId = $id_img;
         $ip = request()->ip();
+        $userAgent = request()->userAgent();
+        $isMobile = $this->isMobileDevice($userAgent);
 
         \Log::info('trackClick: Parámetros recibidos', [
             'email' => $email,
             'imageId' => $imageId,
-            'ip' => $ip
+            'ip' => $ip,
+            'is_mobile' => $isMobile,
+            'user_agent' => $userAgent
         ]);
 
         $redirectUrl = 'https://www.google.com'; // URL por defecto
@@ -219,8 +224,42 @@ class EstadisticasController extends Controller
             ]);
         }
 
-        // Redirigir al destino final
-        return redirect($redirectUrl);
+        // Estrategia de redirección según el dispositivo
+        if ($isMobile) {
+            \Log::info('trackClick: Dispositivo móvil detectado, usando redirección con JavaScript.');
+            // Para dispositivos móviles, usar una página intermedia con JavaScript
+            return view('mobile_redirect', [
+                'redirectUrl' => $redirectUrl,
+                'email' => $email,
+                'imageId' => $imageId
+            ]);
+        } else {
+            \Log::info('trackClick: Dispositivo de escritorio, usando redirección directa.');
+            // Para dispositivos de escritorio, redirección directa
+            return redirect($redirectUrl);
+        }
+    }
+
+    /**
+     * Detecta si el dispositivo es móvil basado en el User Agent
+     */
+    private function isMobileDevice($userAgent)
+    {
+        if (!$userAgent) return false;
+        
+        $mobileKeywords = [
+            'Mobile', 'Android', 'iPhone', 'iPad', 'Windows Phone', 
+            'BlackBerry', 'Opera Mini', 'IEMobile', 'Mobile Safari',
+            'CriOS', 'FxiOS', 'OPiOS', 'Vivaldi'
+        ];
+        
+        foreach ($mobileKeywords as $keyword) {
+            if (stripos($userAgent, $keyword) !== false) {
+                return true;
+            }
+        }
+        
+        return false;
     }
 
     /**
