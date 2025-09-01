@@ -37,6 +37,11 @@ class Click extends Model
     ];
 
     /**
+     * Mutator para asegurar que las fechas se muestren en la zona horaria correcta
+     */
+
+
+    /**
      * Obtiene la imagen asociada al clic
      */
     public function emailImage(): BelongsTo

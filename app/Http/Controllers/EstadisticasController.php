@@ -13,6 +13,8 @@ use Illuminate\Support\Facades\Http;
 
 class EstadisticasController extends Controller
 {
+
+
     public function index()
     {
         // Obtener datos básicos
@@ -1180,7 +1182,7 @@ class EstadisticasController extends Controller
                     'description' => $campaign->description,
                     'priority' => $campaign->priority,
                     'link_redirection' => $campaign->link_redirection,
-                    'created_at' => $campaign->created_at->format('Y-m-d H:i:s'),
+                    'created_at' => $campaign->created_at->format('d/m/Y H:i'),
                     'total_sent' => $totalSent,
                     'total_opened' => $totalOpened,
                     'total_clicked' => $totalClicked,
@@ -1342,6 +1344,134 @@ class EstadisticasController extends Controller
 
         } catch (\Exception $e) {
             \Log::error('AI Agent Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al comunicarse con la IA: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function getEmailImageRecommendations(Request $request)
+    {
+        try {
+            // Obtener datos históricos de las campañas
+            $campaignPerformanceResponse = $this->getCampaignPerformance();
+            $campaignPerformanceData = json_decode($campaignPerformanceResponse->getContent(), true)['data'];
+
+            // Construir el prompt específico para recomendaciones de imágenes de correo
+            $prompt = "Eres un experto en marketing digital y diseño de campañas de email marketing. Necesito que me ayudes a crear contenido efectivo para imágenes de correo electrónico.\n\n";
+
+            if (!empty($campaignPerformanceData)) {
+                $prompt .= "Basándote en el historial de mis campañas anteriores:\n\n";
+                foreach ($campaignPerformanceData as $campaign) {
+                    $prompt .= "• Campaña: \"{$campaign['subject']}\"\n";
+                    $prompt .= "  - Tasa de Apertura: {$campaign['open_rate']}%\n";
+                    $prompt .= "  - Tasa de Clic: {$campaign['click_rate']}%\n";
+                    $prompt .= "  - Enviados: {$campaign['total_sent']}\n\n";
+                }
+                $prompt .= "Proporciona recomendaciones específicas para mejorar el contenido de las imágenes de correo:\n";
+            } else {
+                $prompt .= "Como no hay datos históricos disponibles, proporciona recomendaciones generales pero efectivas para crear imágenes de correo que generen engagement:\n";
+            }
+
+            $prompt .= "1. Elementos visuales que aumentan la tasa de apertura\n";
+            $prompt .= "2. Tipografías y colores recomendados\n";
+            $prompt .= "3. Estructura y composición de la imagen\n";
+            $prompt .= "4. Call-to-action efectivos\n";
+            $prompt .= "5. Mejores prácticas para diferentes tipos de campañas\n";
+            $prompt .= "6. Consejos para optimizar en dispositivos móviles\n\n";
+            $prompt .= "Responde de manera clara y estructurada, con ejemplos prácticos cuando sea posible.";
+
+            // Realizar la solicitud a la API de OpenAI
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
+                'Content-Type' => 'application/json',
+            ])->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-3.5-turbo',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Eres un experto en marketing digital, diseño gráfico y optimización de campañas de email marketing. Especialista en crear contenido visual que genera engagement y conversiones.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'max_tokens' => 800,
+                'temperature' => 0.7,
+            ]);
+
+            $aiResponse = $response->json();
+
+            if (isset($aiResponse['choices'][0]['message']['content'])) {
+                return response()->json([
+                    'success' => true,
+                    'recommendations' => $aiResponse['choices'][0]['message']['content']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo obtener recomendaciones de la IA.',
+                    'error' => $aiResponse
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('AI Email Image Recommendations Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al obtener recomendaciones de la IA: ' . $e->getMessage()
+            ], 500);
+        }
+    }
+
+    public function askAIAboutEmailContent(Request $request)
+    {
+        try {
+            $request->validate([
+                'question' => 'required|string|max:1000',
+                'image_context' => 'nullable|string|max:500'
+            ]);
+
+            $userQuestion = $request->input('question');
+            $imageContext = $request->input('image_context', '');
+
+            // Construir el prompt contextual
+            $prompt = "Eres un experto en marketing digital y diseño de campañas de email marketing. ";
+            
+            if ($imageContext) {
+                $prompt .= "Contexto de la imagen actual: {$imageContext}\n\n";
+            }
+            
+            $prompt .= "Pregunta del usuario: {$userQuestion}\n\n";
+            $prompt .= "Proporciona una respuesta útil, práctica y específica para mejorar el contenido de la imagen de correo. Incluye ejemplos concretos cuando sea posible.";
+
+            // Realizar la solicitud a la API de OpenAI
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
+                'Content-Type' => 'application/json',
+            ])->post('https://api.openai.com/v1/chat/completions', [
+                'model' => 'gpt-3.5-turbo',
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Eres un asistente experto en marketing digital y diseño de campañas de email. Especialista en optimizar contenido visual para aumentar engagement y conversiones.'],
+                    ['role' => 'user', 'content' => $prompt]
+                ],
+                'max_tokens' => 600,
+                'temperature' => 0.7,
+            ]);
+
+            $aiResponse = $response->json();
+
+            if (isset($aiResponse['choices'][0]['message']['content'])) {
+                return response()->json([
+                    'success' => true,
+                    'response' => $aiResponse['choices'][0]['message']['content']
+                ]);
+            } else {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No se pudo obtener una respuesta válida de la IA.',
+                    'error' => $aiResponse
+                ], 500);
+            }
+
+        } catch (\Exception $e) {
+            \Log::error('AI Email Content Question Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 'success' => false,
                 'message' => 'Error al comunicarse con la IA: ' . $e->getMessage()

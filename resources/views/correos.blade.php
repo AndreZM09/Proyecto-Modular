@@ -29,6 +29,100 @@
             Gestión de Correos
         </h1>
 
+        <!-- Asistente de IA para Imágenes de Correo -->
+        <div class="card mb-4" style="border: 2px solid #6366f1; box-shadow: 0 8px 25px rgba(99, 102, 241, 0.15);">
+            <div class="card-header" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); color: white; border-bottom: 2px solid #6366f1;">
+                <i class="bi bi-robot" style="font-size: 1.2em; margin-right: 8px;"></i>
+                <strong>🤖 Asistente de IA para Mejorar tu Contenido</strong>
+            </div>
+            <div class="card-body" style="background: linear-gradient(135deg, #f8fafc 0%, #f1f5f9 100%);">
+                <div class="alert alert-info border-0 mb-4" style="background: linear-gradient(135deg, #dbeafe 0%, #bfdbfe 100%); border: 1px solid #3b82f6; border-radius: 12px;">
+                    <i class="bi bi-lightbulb" style="color: #1d4ed8;"></i>
+                    <strong style="color: #1e40af;">¿Necesitas ayuda para crear imágenes de correo más efectivas?</strong> 
+                    <span style="color: #1e40af;">Nuestro asistente de IA analiza tu historial de campañas y te proporciona recomendaciones personalizadas para mejorar el engagement.</span>
+                </div>
+
+                <div class="row">
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <button type="button" id="getAIRecommendationsBtn" class="btn btn-lg w-100" style="background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%); border: none; color: white; padding: 15px; font-weight: 600; border-radius: 12px; box-shadow: 0 4px 15px rgba(99, 102, 241, 0.3);">
+                                <i class="bi bi-magic" style="font-size: 1.2em; margin-right: 8px;"></i>
+                                Obtener Recomendaciones de IA
+                            </button>
+                            <div class="form-text text-center mt-2" style="color: #6366f1; font-weight: 500;">
+                                <i class="bi bi-info-circle"></i>
+                                Análisis basado en tu historial de campañas
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-md-6">
+                        <div class="mb-3">
+                            <button type="button" id="openAIChatBtn" class="btn btn-outline-primary btn-lg w-100" style="border: 2px solid #6366f1; color: #6366f1; background: white; padding: 15px; font-weight: 600; border-radius: 12px; transition: all 0.3s ease;">
+                                <i class="bi bi-chat-dots" style="font-size: 1.2em; margin-right: 8px;"></i>
+                                Hacer Pregunta Específica
+                            </button>
+                            <div class="form-text text-center mt-2" style="color: #6366f1; font-weight: 500;">
+                                <i class="bi bi-info-circle"></i>
+                                Consulta personalizada sobre tu contenido
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Contenedor de recomendaciones de IA -->
+                <div id="aiRecommendationsContainer" class="mt-4" style="display: none;">
+                    <div class="card" style="border: 2px solid #10b981; background: linear-gradient(135deg, #ecfdf5 0%, #d1fae5 100%);">
+                        <div class="card-header" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); color: white; border-bottom: 2px solid #10b981;">
+                            <i class="bi bi-stars" style="margin-right: 8px;"></i>
+                            <strong>✨ Recomendaciones de IA para tu Contenido</strong>
+                        </div>
+                        <div class="card-body">
+                            <div id="aiRecommendationsContent"></div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Chat de IA -->
+                <div id="aiChatContainer" class="mt-4" style="display: none;">
+                    <div class="card" style="border: 2px solid #f59e0b; background: linear-gradient(135deg, #fffbeb 0%, #fef3c7 100%);">
+                        <div class="card-header d-flex justify-content-between align-items-center" style="background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); color: white; border-bottom: 2px solid #f59e0b;">
+                            <span><i class="bi bi-chat-dots" style="margin-right: 8px;"></i> <strong>💬 Asistente de IA</strong></span>
+                            <button type="button" id="closeAIChatBtn" class="btn btn-sm" style="background: rgba(255,255,255,0.2); border: 1px solid rgba(255,255,255,0.3); color: white;">
+                                <i class="bi bi-x-lg"></i>
+                            </button>
+                        </div>
+                        <div class="card-body">
+                            <div id="aiChatMessages" class="mb-3" style="max-height: 300px; overflow-y: auto; border: 2px solid #fbbf24; border-radius: 12px; padding: 15px; background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);">
+                                <div class="text-center text-muted">
+                                    <i class="bi bi-robot" style="font-size: 2rem; color: #f59e0b;"></i>
+                                    <p class="mt-2 mb-0" style="color: #92400e; font-weight: 500;">¡Hola! Soy tu asistente de IA para marketing de correo. ¿En qué puedo ayudarte hoy?</p>
+                                </div>
+                            </div>
+                            <div class="input-group">
+                                <input type="text" id="aiQuestionInput" class="form-control" placeholder="Escribe tu pregunta sobre el contenido de la imagen..." style="border: 2px solid #fbbf24; border-radius: 8px;">
+                                <button type="button" id="askAIQuestionBtn" class="btn" style="background: linear-gradient(135deg, #10b981 0%, #059669 100%); border: none; color: white; border-radius: 8px; font-weight: 600;">
+                                    <i class="bi bi-send"></i>
+                                    Enviar
+                                </button>
+                            </div>
+                            <div class="form-text mt-2" style="color: #92400e;">
+                                <i class="bi bi-info-circle"></i>
+                                Ejemplos: "¿Qué colores usar para una campaña de descuento?", "¿Cómo mejorar el call-to-action?"
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Indicador de carga -->
+                <div id="aiLoadingIndicator" class="text-center mt-3" style="display: none;">
+                    <div class="spinner-border" role="status" style="color: #6366f1; width: 3rem; height: 3rem;">
+                        <span class="visually-hidden">Cargando...</span>
+                    </div>
+                    <p class="mt-2" style="color: #6366f1; font-weight: 500;">La IA está analizando tu contenido...</p>
+                </div>
+            </div>
+        </div>
+
         <!-- Configuración de Imagen -->
         <div class="card">
             <div class="card-header">

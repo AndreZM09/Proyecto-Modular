@@ -71,6 +71,10 @@ Route::get('/api/campaign-performance', [App\Http\Controllers\EstadisticasContro
 Route::get('/api/campaign-predictions', [App\Http\Controllers\EstadisticasController::class, 'predictCampaignPerformance']);
 Route::post('/api/ask-ai', [App\Http\Controllers\EstadisticasController::class, 'askAIAboutCampaigns']);
 
+// Nuevas rutas para IA en la vista de correos
+Route::get('/api/email-image-recommendations', [App\Http\Controllers\EstadisticasController::class, 'getEmailImageRecommendations']);
+Route::post('/api/ask-ai-email-content', [App\Http\Controllers\EstadisticasController::class, 'askAIAboutEmailContent']);
+
 Route::get('/ai-predictions', function () {
     return view('ai_predictions');
 })->name('ai.predictions');
