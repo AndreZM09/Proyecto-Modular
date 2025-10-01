@@ -18,6 +18,77 @@
         body {
             padding-top: 70px !important; /* Espacio para la barra de navegación fija */
         }
+        
+        /* Estilos para el chat de IA */
+        .ai-message, .user-message {
+            margin-bottom: 15px;
+            padding: 12px 16px;
+            border-radius: 12px;
+            max-width: 80%;
+            word-wrap: break-word;
+        }
+        
+        .user-message {
+            background: linear-gradient(135deg, #6366f1 0%, #8b5cf6 100%);
+            color: white;
+            margin-left: auto;
+            text-align: right;
+        }
+        
+        .ai-message {
+            background: linear-gradient(135deg, #f0f9ff 0%, #e0f2fe 100%);
+            color: #1e40af;
+            border: 1px solid #bae6fd;
+            margin-right: auto;
+        }
+        
+        .ai-message.error {
+            background: linear-gradient(135deg, #fef2f2 0%, #fee2e2 100%);
+            color: #dc2626;
+            border: 1px solid #fecaca;
+        }
+        
+        .message-content {
+            display: flex;
+            align-items: flex-start;
+            gap: 8px;
+        }
+        
+        .message-content i {
+            font-size: 1.1em;
+            margin-top: 2px;
+        }
+        
+        .message-content span {
+            flex: 1;
+            white-space: pre-line;
+            line-height: 1.5;
+        }
+        
+        #aiChatContainer {
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(0,0,0,0.1);
+            border: 2px solid #fbbf24;
+        }
+        
+        #aiChatMessages {
+            min-height: 200px;
+            max-height: 400px;
+            overflow-y: auto;
+            padding: 20px;
+            background: linear-gradient(135deg, #fefce8 0%, #fef9c3 100%);
+        }
+        
+        #aiRecommendationsContainer .card {
+            border: 2px solid #10b981;
+            border-radius: 12px;
+            box-shadow: 0 8px 25px rgba(16, 185, 129, 0.15);
+        }
+        
+        .ai-response {
+            font-size: 1.05em;
+            line-height: 1.7;
+        }
     </style>
 </head>
 <body>
@@ -502,6 +573,145 @@
             setTimeout(function() {
                 $('.alert-message').fadeOut();
             }, 5000);
+        }
+
+        // ===== FUNCIONALIDAD DE IA =====
+        
+        // Botón de Recomendaciones de IA
+        document.getElementById('getAIRecommendationsBtn').addEventListener('click', async function() {
+            const btn = this;
+            const container = document.getElementById('aiRecommendationsContainer');
+            const content = document.getElementById('aiRecommendationsContent');
+            
+            // Mostrar estado de carga
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Analizando...';
+            
+            try {
+                const response = await fetch('/api/email-image-recommendations', {
+                    method: 'GET',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    }
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    content.innerHTML = `
+                        <div class="ai-response" style="white-space: pre-line; line-height: 1.6;">
+                            ${data.recommendations}
+                        </div>
+                    `;
+                    container.style.display = 'block';
+                    showMessage('success', 'Recomendaciones de IA generadas exitosamente');
+                } else {
+                    showMessage('error', data.message || 'Error al obtener recomendaciones de IA');
+                }
+            } catch (error) {
+                console.error('Error al obtener recomendaciones de IA:', error);
+                showMessage('error', 'Error de conexión con la IA. Verifica que LM Studio esté ejecutándose.');
+            } finally {
+                // Restaurar botón
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-magic"></i> Obtener Recomendaciones de IA';
+            }
+        });
+
+        // Botón de Chat de IA
+        document.getElementById('openAIChatBtn').addEventListener('click', function() {
+            const container = document.getElementById('aiChatContainer');
+            container.style.display = container.style.display === 'none' ? 'block' : 'none';
+        });
+
+        // Botón para cerrar el chat de IA
+        document.getElementById('closeAIChatBtn').addEventListener('click', function() {
+            document.getElementById('aiChatContainer').style.display = 'none';
+        });
+
+        // Enviar pregunta al chat de IA
+        document.getElementById('askAIQuestionBtn').addEventListener('click', async function() {
+            const input = document.getElementById('aiQuestionInput');
+            const question = input.value.trim();
+            
+            if (!question) {
+                showMessage('error', 'Por favor, escribe una pregunta');
+                return;
+            }
+
+            const btn = this;
+            const messagesContainer = document.getElementById('aiChatMessages');
+            
+            // Mostrar pregunta del usuario
+            addChatMessage(question, 'user');
+            input.value = '';
+            
+            // Mostrar estado de carga
+            btn.disabled = true;
+            btn.innerHTML = '<i class="bi bi-hourglass-split"></i> Pensando...';
+            
+            try {
+                const response = await fetch('/api/ask-ai-email-content', {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': document.querySelector('meta[name="csrf-token"]').getAttribute('content')
+                    },
+                    body: JSON.stringify({ question: question })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success) {
+                    addChatMessage(data.response, 'ai');
+                } else {
+                    addChatMessage('Error: ' + (data.message || 'No se pudo obtener una respuesta válida.'), 'ai error');
+                }
+            } catch (error) {
+                console.error('Error al comunicarse con la IA:', error);
+                addChatMessage('Lo siento, no pude conectar con la IA. Por favor, verifica que LM Studio esté ejecutándose.', 'ai error');
+            } finally {
+                // Restaurar botón
+                btn.disabled = false;
+                btn.innerHTML = '<i class="bi bi-send"></i> Enviar';
+            }
+        });
+
+        // Enviar pregunta con Enter
+        document.getElementById('aiQuestionInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                document.getElementById('askAIQuestionBtn').click();
+            }
+        });
+
+        // Función para agregar mensajes al chat
+        function addChatMessage(text, sender) {
+            const messagesContainer = document.getElementById('aiChatMessages');
+            const messageDiv = document.createElement('div');
+            
+            let messageClass, icon;
+            if (sender === 'user') {
+                messageClass = 'user-message';
+                icon = 'bi-person-fill';
+            } else if (sender === 'ai error') {
+                messageClass = 'ai-message error';
+                icon = 'bi-exclamation-triangle-fill';
+            } else {
+                messageClass = 'ai-message';
+                icon = 'bi-robot';
+            }
+            
+            messageDiv.className = messageClass;
+            messageDiv.innerHTML = `
+                <div class="message-content">
+                    <i class="bi ${icon}"></i>
+                    <span>${text}</span>
+                </div>
+            `;
+            
+            messagesContainer.appendChild(messageDiv);
+            messagesContainer.scrollTop = messagesContainer.scrollHeight;
         }
     </script>
 </body>

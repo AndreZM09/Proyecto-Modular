@@ -1235,21 +1235,13 @@ class EstadisticasController extends Controller
 
             $prompt .= "Predicciones y Recomendaciones para FUTURAS campañas:\n";
 
-            // 3. Realizar la solicitud a la API de OpenAI
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-3.5-turbo', // Puedes cambiar a 'gpt-4' si tienes acceso y lo prefieres
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Eres un experto en marketing digital y análisis de campañas de correo electrónico.'],
-                    ['role' => 'user', 'content' => $prompt]
-                ],
-                'max_tokens' => 500, // Ajusta esto según la longitud deseada de la respuesta
-                'temperature' => 0.7, // Ajusta la creatividad de la respuesta (0.0-1.0)
-            ]);
-
-            $aiResponse = $response->json();
+            // 3. Realizar la solicitud a la API compatible (LM Studio u otra)
+            $aiResponse = $this->createChatCompletion(
+                'Eres un experto en marketing digital y análisis de campañas de correo electrónico.',
+                $prompt,
+                500,
+                0.7
+            );
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
@@ -1308,24 +1300,17 @@ class EstadisticasController extends Controller
 
             $prompt = $contextData . $userQuestion;
 
-            \Log::info('AI Agent Request Prompt:', ['prompt' => $prompt]); // Log the prompt
+            \Log::info('AI Agent Request Prompt:', ['prompt' => $prompt]);
 
-            // Realizar la solicitud a la API de OpenAI
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-3.5-turbo', // O 'gpt-4' si tienes acceso y lo prefieres
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Eres un asistente de marketing digital experto en analizar el rendimiento de campañas de email y proporcionar información útil, predicciones y recomendaciones basadas en los datos proporcionados. Siempre responde en español de manera clara y concisa. Si no tienes suficientes datos para una predicción específica, dilo claramente.'],
-                    ['role' => 'user', 'content' => $prompt]
-                ],
-                'max_tokens' => 700, // Aumentado para respuestas más detalladas
-                'temperature' => 0.7, 
-            ]);
+            // Realizar la solicitud a la API compatible (LM Studio u otra)
+            $aiResponse = $this->createChatCompletion(
+                'Eres un asistente de marketing digital experto en analizar el rendimiento de campañas de email y proporcionar información útil, predicciones y recomendaciones basadas en los datos proporcionados. Siempre responde en español de manera clara y concisa. Si no tienes suficientes datos para una predicción específica, dilo claramente.',
+                $prompt,
+                700,
+                0.7
+            );
 
-            $aiResponse = $response->json();
-            \Log::info('AI Agent Response (Raw):', ['response' => $aiResponse]); // Log raw AI response
+            \Log::info('AI Agent Response (Raw):', ['response' => $aiResponse]);
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
@@ -1333,7 +1318,6 @@ class EstadisticasController extends Controller
                     'response' => $aiResponse['choices'][0]['message']['content']
                 ]);
             } else {
-                // Log the error response from OpenAI if content is missing
                 \Log::error('AI Agent: No content in OpenAI response.', ['raw_response' => $aiResponse]);
                 return response()->json([
                     'success' => false,
@@ -1382,21 +1366,13 @@ class EstadisticasController extends Controller
             $prompt .= "6. Consejos para optimizar en dispositivos móviles\n\n";
             $prompt .= "Responde de manera clara y estructurada, con ejemplos prácticos cuando sea posible.";
 
-            // Realizar la solicitud a la API de OpenAI
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-3.5-turbo',
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Eres un experto en marketing digital, diseño gráfico y optimización de campañas de email marketing. Especialista en crear contenido visual que genera engagement y conversiones.'],
-                    ['role' => 'user', 'content' => $prompt]
-                ],
-                'max_tokens' => 800,
-                'temperature' => 0.7,
-            ]);
-
-            $aiResponse = $response->json();
+            // Realizar la solicitud a la API compatible (LM Studio u otra)
+            $aiResponse = $this->createChatCompletion(
+                'Eres un experto en marketing digital, diseño gráfico y optimización de campañas de email marketing. Especialista en crear contenido visual que genera engagement y conversiones.',
+                $prompt,
+                800,
+                0.7
+            );
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
@@ -1441,21 +1417,13 @@ class EstadisticasController extends Controller
             $prompt .= "Pregunta del usuario: {$userQuestion}\n\n";
             $prompt .= "Proporciona una respuesta útil, práctica y específica para mejorar el contenido de la imagen de correo. Incluye ejemplos concretos cuando sea posible.";
 
-            // Realizar la solicitud a la API de OpenAI
-            $response = Http::withHeaders([
-                'Authorization' => 'Bearer ' . env('OPENAI_API_KEY'),
-                'Content-Type' => 'application/json',
-            ])->post('https://api.openai.com/v1/chat/completions', [
-                'model' => 'gpt-3.5-turbo',
-                'messages' => [
-                    ['role' => 'system', 'content' => 'Eres un asistente experto en marketing digital y diseño de campañas de email. Especialista en optimizar contenido visual para aumentar engagement y conversiones.'],
-                    ['role' => 'user', 'content' => $prompt]
-                ],
-                'max_tokens' => 600,
-                'temperature' => 0.7,
-            ]);
-
-            $aiResponse = $response->json();
+            // Realizar la solicitud a la API compatible (LM Studio u otra)
+            $aiResponse = $this->createChatCompletion(
+                'Eres un asistente experto en marketing digital y diseño de campañas de email. Especialista en optimizar contenido visual para aumentar engagement y conversiones.',
+                $prompt,
+                600,
+                0.7
+            );
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
@@ -1477,5 +1445,32 @@ class EstadisticasController extends Controller
                 'message' => 'Error al comunicarse con la IA: ' . $e->getMessage()
             ], 500);
         }
+    }
+
+    /**
+     * Cliente genérico para APIs compatibles con OpenAI (LM Studio local, etc.)
+     */
+    private function createChatCompletion(string $systemPrompt, string $userPrompt, int $maxTokens, float $temperature)
+    {
+        $baseUrl = rtrim(env('LLM_BASE_URL', 'http://localhost:1234/v1'), '/');
+        $apiKey = env('LLM_API_KEY', 'lm-studio'); // LM Studio acepta cualquier valor
+        $model = env('LLM_MODEL', 'deepseek-r1:latest');
+
+        $endpoint = $baseUrl . '/chat/completions';
+
+        $response = Http::withHeaders([
+            'Authorization' => 'Bearer ' . $apiKey,
+            'Content-Type' => 'application/json',
+        ])->timeout(60)->post($endpoint, [
+            'model' => $model,
+            'messages' => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user', 'content' => $userPrompt]
+            ],
+            'max_tokens' => $maxTokens,
+            'temperature' => $temperature,
+        ]);
+
+        return $response->json();
     }
 }

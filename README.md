@@ -1,108 +1,331 @@
-# Proyecto Modular - Guía de Configuración y Ejecución
+# 📬 Proyecto Modular - Sistema de Marketing por Correo Electrónico
 
-Este documento proporciona las instrucciones necesarias para configurar y ejecutar el proyecto modular de Laravel desde cero. Sigue estos pasos cuidadosamente para asegurar una instalación exitosa.
+[![Laravel](https://img.shields.io/badge/Laravel-11.x-red.svg)](https://laravel.com)
+[![PHP](https://img.shields.io/badge/PHP-8.1+-blue.svg)](https://php.net)
+[![MySQL](https://img.shields.io/badge/MySQL-8.0+-orange.svg)](https://mysql.com)
+[![AI Powered](https://img.shields.io/badge/AI-LM%20Studio-green.svg)](https://lmstudio.ai)
 
-## 1. Requisitos Previos
+Un sistema completo de marketing por correo electrónico desarrollado en Laravel con **Inteligencia Artificial integrada** usando LM Studio y DeepSeek. Incluye análisis de campañas, tracking de clics, redirección móvil y recomendaciones automáticas de IA.
 
-Asegúrate de tener instalado el siguiente software en tu sistema:
+## 🚀 Características Principales
 
-*   **PHP:** Versión 8.1 o superior. Puedes verificar tu versión con `php -v`.
-*   **Composer:** Administrador de paquetes para PHP. Descárgalo desde [getcomposer.org](https://getcomposer.org/download/).
-*   **Node.js y npm:** Para la gestión de dependencias frontend. Descárgalos desde [nodejs.org](https://nodejs.org/en/download/).
-*   **Servidor Web (Apache/Nginx):** Se recomienda usar XAMPP para un entorno de desarrollo fácil. Descarga XAMPP desde [apachefriends.org](https://www.apachefriends.org/index.html).
-*   **Base de Datos (MySQL):** XAMPP incluye MySQL. Asegúrate de que el servicio de MySQL esté corriendo.
+### 📧 **Gestión de Campañas**
+- Envío masivo de correos electrónicos
+- Plantillas personalizables con imágenes
+- Listas de correos desde archivos Excel/CSV
+- Seguimiento de aperturas y clics en tiempo real
 
-## 2. Clonar el Repositorio
+### 🤖 **Inteligencia Artificial Integrada**
+- **IA Completamente Gratuita** usando LM Studio + DeepSeek
+- Recomendaciones automáticas para diseño de correos
+- Chat personalizado con IA para consultas específicas
+- Análisis predictivo de rendimiento de campañas
+- Consejos de optimización basados en datos históricos
 
-Primero, clona el repositorio del proyecto en tu máquina local. Si estás usando XAMPP, se recomienda clonar el proyecto dentro del directorio `htdocs` de XAMPP (ej. `C:\xampp\htdocs\Proyecto-Modular`).
+### 📊 **Analytics y Estadísticas**
+- Dashboard completo con métricas en tiempo real
+- Gráficos interactivos de rendimiento
+- Análisis de tasa de apertura y clics
+- Predicciones de IA para futuras campañas
+
+### 📱 **Optimización Móvil**
+- Redirección automática para dispositivos móviles
+- Tracking optimizado para smartphones
+- Interfaz responsive y moderna
+
+## 🛠️ Requisitos del Sistema
+
+### **Requisitos Mínimos**
+- **PHP:** 8.1 o superior
+- **MySQL:** 8.0 o superior
+- **Composer:** Última versión
+- **Node.js:** 16.x o superior
+- **RAM:** 8GB mínimo (16GB recomendado para IA)
+- **Espacio:** 5GB libres
+
+### **Para Funcionalidad de IA**
+- **LM Studio:** [Descargar aquí](https://lmstudio.ai/)
+- **Modelo DeepSeek:** ~2-4GB de espacio adicional
+- **RAM:** 16GB+ recomendado para mejor rendimiento
+
+## 📥 Instalación Rápida
+
+### 1. **Clonar el Repositorio**
 
 ```bash
-git clone <URL_DEL_REPOSITORIO>
+git clone https://github.com/AndreZM09/Proyecto-Modular.git
 cd Proyecto-Modular
 ```
 
-**Nota:** Reemplaza `<URL_DEL_REPOSITORIO>` con la URL real de tu repositorio Git.
-
-## 3. Instalación de Dependencias
-
-### 3.1. Dependencias de PHP (Composer)
-
-Navega al directorio raíz del proyecto y ejecuta Composer para instalar las dependencias de PHP:
+### 2. **Instalar Dependencias**
 
 ```bash
+# Dependencias de PHP
 composer install
-```
 
-### 3.2. Dependencias de JavaScript (NPM)
-
-Luego, instala las dependencias de Node.js:
-
-```bash
+# Dependencias de JavaScript
 npm install
 ```
 
-## 4. Configuración del Entorno
-
-### 4.1. Crear el Archivo `.env`
-
-Laravel utiliza un archivo `.env` para la configuración del entorno. Copia el archivo de ejemplo:
+### 3. **Configurar Entorno**
 
 ```bash
+# Copiar archivo de configuración
 cp .env.example .env
-```
 
-### 4.2. Generar la Clave de Aplicación
-
-Genera una clave de aplicación única. Esta clave se utiliza para la encriptación de sesiones y otros datos sensibles:
-
-```bash
+# Generar clave de aplicación
 php artisan key:generate
 ```
 
-### 4.3. Configurar la Base de Datos
+### 4. **Configurar Base de Datos**
 
-Abre el archivo `.env` y configura los parámetros de conexión a tu base de datos MySQL. Asegúrate de que el nombre de la base de datos (`DB_DATABASE`) exista en tu servidor MySQL.
+Edita el archivo `.env` con tus credenciales de MySQL:
 
 ```ini
 DB_CONNECTION=mysql
 DB_HOST=127.0.0.1
 DB_PORT=3306
-DB_DATABASE=nombre_de_tu_base_de_datos
-DB_USERNAME=tu_usuario_de_mysql
-DB_PASSWORD=tu_contraseña_de_mysql
+DB_DATABASE=proyecto_modular
+DB_USERNAME=root
+DB_PASSWORD=
 ```
 
-## 5. Migraciones y Seeders de la Base de Datos
-
-Ejecuta las migraciones para crear las tablas de la base de datos. Si tienes seeders para datos iniciales, puedes ejecutarlos también:
+### 5. **Ejecutar Migraciones**
 
 ```bash
+# Crear tablas de la base de datos
 php artisan migrate
+
+# Opcional: Cargar datos de ejemplo
 php artisan db:seed
 ```
 
-**Nota:** El comando `php artisan db:seed` ejecutará todos los seeders. Si solo quieres ejecutar un seeder específico, usa `php artisan db:seed --class=NombreDelSeeder` (ej. `UsersTableSeeder`).
-
-## 6. Compilar Assets Frontend
-
-Compila los assets CSS y JavaScript del proyecto:
+### 6. **Compilar Assets**
 
 ```bash
 npm run dev
 ```
 
-Para producción, puedes usar:
+### 7. **Iniciar Servidor**
 
 ```bash
-npm run build
-```
-
-## 7. Ejecutar el Servidor de Desarrollo
-
-Si no estás utilizando un servidor web como Apache/Nginx directamente, puedes usar el servidor de desarrollo integrado de Laravel:
-
-```bash
+# Opción 1: Servidor de desarrollo Laravel
 php artisan serve
+
+# Opción 2: Con XAMPP (recomendado)
+# Asegúrate de que Apache y MySQL estén ejecutándose
+# Accede a: http://localhost/Proyecto-Modular/public
 ```
 
-Esto iniciará el servidor en `http://127.0.0.1:8000` (o un puerto similar). Si estás usando XAMPP, asegúrate de que Apache y MySQL estén corriendo, y accede al proyecto a través de la URL configurada en tu servidor web (ej. `http://localhost/Proyecto-Modular/public`).
+## 🤖 Configuración de IA (LM Studio)
+
+### **Paso 1: Instalar LM Studio**
+1. Descarga LM Studio desde [lmstudio.ai](https://lmstudio.ai/)
+2. Instala la aplicación
+
+### **Paso 2: Descargar Modelo DeepSeek**
+1. Abre LM Studio
+2. Ve a la pestaña "Models"
+3. Busca "DeepSeek" o "deepseek-r1"
+4. Descarga el modelo (recomendado: `deepseek-r1-0528-qwen3-8b`)
+
+### **Paso 3: Cargar Modelo y Iniciar Servidor**
+1. Ve a la pestaña "Chat" en LM Studio
+2. Selecciona el modelo DeepSeek descargado
+3. Haz clic en "Load Model"
+4. Ve a la pestaña "Local Server"
+5. Haz clic en "Start Server" (puerto 1234)
+
+### **Paso 4: Configurar Variables de Entorno**
+
+Agrega estas líneas a tu archivo `.env`:
+
+```ini
+# Configuración de IA (LM Studio)
+LLM_BASE_URL=http://localhost:1234/v1
+LLM_API_KEY=lm-studio
+LLM_MODEL=deepseek-r1-0528-qwen3-8b
+```
+
+### **Paso 5: Probar Conexión**
+
+```bash
+php artisan llm:test --provider=lmstudio
+```
+
+## 🎯 Uso del Sistema
+
+### **Acceso al Sistema**
+1. Ve a `http://localhost/Proyecto-Modular/public`
+2. Inicia sesión con las credenciales por defecto
+3. Navega a "Correos" para gestionar campañas
+
+### **Funcionalidades de IA**
+
+#### **Recomendaciones Automáticas**
+- Haz clic en "Obtener Recomendaciones de IA"
+- Recibe consejos sobre colores, tipografías y diseño
+- Análisis basado en tu historial de campañas
+
+#### **Chat Personalizado**
+- Haz clic en "Hacer Pregunta Específica"
+- Pregunta sobre mejores horas para enviar correos
+- Consulta sobre optimización de contenido
+- Análisis de rendimiento de campañas
+
+### **Ejemplos de Preguntas para la IA**
+
+```
+¿Cuáles son las mejores horas para enviar correos según mis datos?
+¿Qué colores debo usar para una campaña de descuento?
+¿Cómo puedo mejorar la tasa de apertura de mis correos?
+¿Qué tipo de contenido genera más clics?
+```
+
+## 📁 Estructura del Proyecto
+
+```
+Proyecto-Modular/
+├── app/
+│   ├── Http/Controllers/     # Controladores principales
+│   ├── Models/              # Modelos de datos
+│   └── Console/Commands/    # Comandos Artisan
+├── database/
+│   ├── migrations/          # Migraciones de BD
+│   └── seeders/            # Datos iniciales
+├── resources/
+│   ├── views/              # Vistas Blade
+│   └── css/                # Estilos personalizados
+├── routes/
+│   └── web.php             # Rutas de la aplicación
+├── storage/
+│   └── app/public/         # Archivos subidos
+└── public/
+    ├── css/                # CSS compilado
+    └── imagenes/           # Imágenes estáticas
+```
+
+## 🔧 Comandos Útiles
+
+### **Desarrollo**
+```bash
+# Limpiar cache
+php artisan cache:clear
+
+# Regenerar autoload
+composer dump-autoload
+
+# Ver rutas
+php artisan route:list
+```
+
+### **Base de Datos**
+```bash
+# Ejecutar migraciones
+php artisan migrate
+
+# Rollback migraciones
+php artisan migrate:rollback
+
+# Ejecutar seeders
+php artisan db:seed
+```
+
+### **IA y Testing**
+```bash
+# Probar conexión con LM Studio
+php artisan llm:test --provider=lmstudio
+
+# Probar conexión con OpenAI
+php artisan llm:test --provider=openai
+```
+
+## 🎨 Personalización
+
+### **Estilos CSS**
+- Edita archivos en `public/css/`
+- Los estilos se compilan automáticamente
+
+### **Funcionalidad de IA**
+- Modifica prompts en `app/Http/Controllers/EstadisticasController.php`
+- Ajusta parámetros de temperatura y tokens
+- Personaliza respuestas del sistema
+
+### **Templates de Correo**
+- Edita vistas en `resources/views/`
+- Personaliza diseño y contenido
+
+## 🐛 Solución de Problemas
+
+### **Error de Conexión con IA**
+```bash
+# Verificar que LM Studio esté ejecutándose
+php artisan llm:test --provider=lmstudio
+
+# Verificar logs
+tail -f storage/logs/laravel.log
+```
+
+### **Error de Base de Datos**
+```bash
+# Verificar conexión
+php artisan migrate:status
+
+# Recrear base de datos
+php artisan migrate:fresh --seed
+```
+
+### **Error de Permisos**
+```bash
+# Dar permisos a storage
+chmod -R 775 storage/
+chmod -R 775 bootstrap/cache/
+```
+
+## 📊 Rendimiento y Optimización
+
+### **Para Mejor Rendimiento de IA**
+- Usa GPU si está disponible en LM Studio
+- Cierra otras aplicaciones que consuman RAM
+- Considera usar modelos más pequeños si tienes poca RAM
+
+### **Para Mejor Rendimiento General**
+- Usa `npm run build` para producción
+- Configura cache de Laravel
+- Optimiza imágenes antes de subirlas
+
+## 🤝 Contribución
+
+1. Fork el proyecto
+2. Crea una rama para tu feature (`git checkout -b feature/AmazingFeature`)
+3. Commit tus cambios (`git commit -m 'Add some AmazingFeature'`)
+4. Push a la rama (`git push origin feature/AmazingFeature`)
+5. Abre un Pull Request
+
+## 📝 Licencia
+
+Este proyecto está bajo la Licencia MIT. Ver el archivo `LICENSE` para más detalles.
+
+## 👥 Equipo
+
+- **Desarrollo Principal:** [AndreZM09](https://github.com/AndreZM09)
+- **IA Integration:** Configuración LM Studio + DeepSeek
+- **Frontend:** Bootstrap 5 + CSS personalizado
+- **Backend:** Laravel 11 + MySQL
+
+## 📞 Soporte
+
+Si tienes problemas o preguntas:
+
+1. **Revisa la documentación** en este README
+2. **Consulta los logs** en `storage/logs/laravel.log`
+3. **Verifica la configuración** de LM Studio
+4. **Abre un issue** en GitHub
+
+## 🎉 ¡Disfruta de tu IA Gratuita!
+
+Este proyecto te permite usar Inteligencia Artificial de forma **completamente gratuita** para optimizar tus campañas de marketing por correo electrónico. ¡No hay límites de uso ni costos ocultos!
+
+---
+
+**⭐ Si te gusta este proyecto, ¡dale una estrella en GitHub!**

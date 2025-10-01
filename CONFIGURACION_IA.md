@@ -1,4 +1,29 @@
-# Configuración de IA OpenAI para el Proyecto Modular
+# 🤖 Configuración de IA para el Proyecto Modular
+
+> **⚠️ IMPORTANTE**: Este archivo está desactualizado. Para la configuración más reciente con LM Studio, consulta [CONFIGURACION_LM_STUDIO.md](CONFIGURACION_LM_STUDIO.md) o [CONFIGURACION_COMPLETA.md](CONFIGURACION_COMPLETA.md).
+
+## 🆕 **NUEVA CONFIGURACIÓN RECOMENDADA: LM Studio + DeepSeek**
+
+El proyecto ahora usa **LM Studio con DeepSeek** que es:
+- ✅ **Completamente gratuito** (sin costos por tokens)
+- ✅ **100% local** (privacidad total)
+- ✅ **Sin límites** de uso
+- ✅ **Calidad comparable** a GPT-4
+
+### **Configuración Rápida:**
+1. Instala [LM Studio](https://lmstudio.ai/)
+2. Descarga el modelo DeepSeek
+3. Inicia el servidor local
+4. Configura las variables en `.env`:
+   ```ini
+   LLM_BASE_URL=http://localhost:1234/v1
+   LLM_API_KEY=lm-studio
+   LLM_MODEL=deepseek-r1-0528-qwen3-8b
+   ```
+
+---
+
+# Configuración Legacy de IA OpenAI para el Proyecto Modular
 
 ## Requisitos Previos
 

@@ -13,19 +13,108 @@ class TestOpenAI extends Command
      *
      * @var string
      */
-    protected $signature = 'openai:test';
+    protected $signature = 'llm:test {--provider=lmstudio : Provider to test (lmstudio, openai)}';
 
     /**
      * The console command description.
      *
      * @var string
      */
-    protected $description = 'Test the OpenAI API connection';
+    protected $description = 'Test the LLM API connection (LM Studio or OpenAI)';
 
     /**
      * Execute the console command.
      */
     public function handle()
+    {
+        $provider = $this->option('provider');
+        
+        if ($provider === 'lmstudio') {
+            return $this->testLMStudio();
+        } elseif ($provider === 'openai') {
+            return $this->testOpenAI();
+        } else {
+            $this->error('❌ Proveedor no válido. Usa: lmstudio o openai');
+            return 1;
+        }
+    }
+
+    private function testLMStudio()
+    {
+        $this->info('🧪 Probando conexión con LM Studio...');
+        
+        // Verificar configuración de LM Studio
+        $baseUrl = env('LLM_BASE_URL', 'http://localhost:1234/v1');
+        $apiKey = env('LLM_API_KEY', 'lm-studio');
+        $model = env('LLM_MODEL', 'deepseek-r1:latest');
+        
+        $this->info("🔗 URL base: {$baseUrl}");
+        $this->info("🤖 Modelo: {$model}");
+        
+        // Probar la conexión con LM Studio
+        try {
+            $this->info('🌐 Enviando solicitud de prueba a LM Studio...');
+            
+            $endpoint = rtrim($baseUrl, '/') . '/chat/completions';
+            
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(30)->post($endpoint, [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => 'Eres un asistente útil.'],
+                    ['role' => 'user', 'content' => 'Responde solo con "Conexión exitosa"']
+                ],
+                'max_tokens' => 10,
+                'temperature' => 0,
+            ]);
+            
+            if ($response->successful()) {
+                $data = $response->json();
+                
+                if (isset($data['choices'][0]['message']['content'])) {
+                    $this->info('✅ Conexión exitosa con LM Studio!');
+                    $this->info('📝 Respuesta de prueba: ' . $data['choices'][0]['message']['content']);
+                    $this->info('🔑 Configuración válida');
+                    $this->info('🚀 La funcionalidad de IA está lista para usar');
+                    
+                    // Mostrar información de uso
+                    $this->newLine();
+                    $this->info('📊 Información de uso:');
+                    $this->line('• Modelo: ' . $model);
+                    $this->line('• URL: ' . $endpoint);
+                    $this->line('• Costo: $0.00 USD (gratuito local)');
+                    
+                    return 0;
+                } else {
+                    $this->error('❌ Respuesta inesperada de LM Studio');
+                    $this->line('Respuesta completa: ' . json_encode($data, JSON_PRETTY_PRINT));
+                    return 1;
+                }
+            } else {
+                $this->error('❌ Error en la respuesta de LM Studio');
+                $this->line('Status: ' . $response->status());
+                $this->line('Respuesta: ' . $response->body());
+                $this->newLine();
+                $this->info('💡 Verifica que:');
+                $this->line('• LM Studio esté ejecutándose');
+                $this->line('• El modelo DeepSeek esté cargado');
+                $this->line('• El servidor local esté en http://localhost:1234');
+                return 1;
+            }
+        } catch (\Exception $e) {
+            $this->error('❌ Error de conexión: ' . $e->getMessage());
+            $this->newLine();
+            $this->info('💡 Verifica que:');
+            $this->line('• LM Studio esté ejecutándose');
+            $this->line('• El modelo DeepSeek esté cargado');
+            $this->line('• El servidor local esté en http://localhost:1234');
+            return 1;
+        }
+    }
+
+    private function testOpenAI()
     {
         $this->info('🧪 Probando conexión con OpenAI...');
         
@@ -93,24 +182,16 @@ class TestOpenAI extends Command
                 // Interpretar errores comunes
                 if ($response->status() === 401) {
                     $this->error('🔑 API Key inválida o expirada');
-                    $this->info('💡 Verifica tu API key en el dashboard de OpenAI');
                 } elseif ($response->status() === 429) {
-                    $this->error('⏰ Límite de tasa excedido');
-                    $this->info('💡 Espera un momento y vuelve a intentar');
-                } elseif ($response->status() === 402) {
-                    $this->error('💰 Cuota de API agotada');
-                    $this->info('💡 Verifica tu saldo en el dashboard de OpenAI');
+                    $this->error('⏰ Límite de cuota excedido');
+                } elseif ($response->status() === 500) {
+                    $this->error('🔧 Error interno del servidor de OpenAI');
                 }
                 
                 return 1;
             }
-            
         } catch (\Exception $e) {
             $this->error('❌ Error de conexión: ' . $e->getMessage());
-            Log::error('OpenAI Test Error', [
-                'message' => $e->getMessage(),
-                'trace' => $e->getTraceAsString()
-            ]);
             return 1;
         }
     }
