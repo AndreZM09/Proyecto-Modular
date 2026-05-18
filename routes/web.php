@@ -55,8 +55,14 @@ Route::get('/campaign-images/{filename}', function ($filename) {
 })->name('campaign.image');
 
 // Rutas de seguimiento
-Route::get('/clicks/track/{id_img}/{email}', [EstadisticasController::class, 'trackClick'])->name('clicks.track');
-Route::get('/emails/open/{id_img}/{email}', [EstadisticasController::class, 'trackOpen'])->name('clicks.open');
+// La constraint where('email', '[^/]+') permite emails URL-encoded (ej: user%40dominio.com)
+// y evita que Laravel rechace la ruta cuando el email tiene caracteres especiales.
+Route::get('/clicks/track/{id_img}/{email}', [EstadisticasController::class, 'trackClick'])
+    ->where('email', '[^/]+')
+    ->name('clicks.track');
+Route::get('/emails/open/{id_img}/{email}', [EstadisticasController::class, 'trackOpen'])
+    ->where('email', '[^/]+')
+    ->name('clicks.open');
 
 // Ruta de prueba
 Route::get('/test-click', [TestController::class, 'testClick'])->name('test.click');
@@ -74,6 +80,12 @@ Route::post('/api/ask-ai', [App\Http\Controllers\EstadisticasController::class, 
 // Nuevas rutas para IA en la vista de correos
 Route::get('/api/email-image-recommendations', [App\Http\Controllers\EstadisticasController::class, 'getEmailImageRecommendations']);
 Route::post('/api/ask-ai-email-content', [App\Http\Controllers\EstadisticasController::class, 'askAIAboutEmailContent']);
+
+// Recomendación de horarios óptimos de envío basada en aperturas históricas
+// - /api/open-stats-by-time: devuelve solo los datos crudos (sin IA), útil para gráficas
+// - /api/optimal-send-time:  pide a la IA una recomendación interpretando los datos
+Route::get('/api/open-stats-by-time', [App\Http\Controllers\EstadisticasController::class, 'getOpenStatsByTime']);
+Route::get('/api/optimal-send-time', [App\Http\Controllers\EstadisticasController::class, 'getOptimalSendTimeRecommendation']);
 
 Route::get('/ai-predictions', function () {
     return view('ai_predictions');

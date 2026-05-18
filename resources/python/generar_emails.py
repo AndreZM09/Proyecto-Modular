@@ -7,6 +7,7 @@ from email.mime.multipart import MIMEMultipart
 from email.mime.image import MIMEImage
 from dotenv import load_dotenv
 import base64
+from urllib.parse import quote as url_quote
 
 # Cargar variables de entorno con encoding específico
 load_dotenv(encoding='utf-8-sig')
@@ -45,6 +46,22 @@ def main():
         
         # Obtener la URL base
         base_url = os.getenv('APP_URL', 'http://127.0.0.1:8000')
+
+        # ⚠️ VALIDACIÓN CRÍTICA: localhost/127.0.0.1 hace que el tracking
+        # NUNCA funcione en dispositivos móviles porque esas direcciones
+        # apuntan al propio dispositivo (el teléfono), no al servidor.
+        if 'localhost' in base_url or '127.0.0.1' in base_url:
+            print("=" * 60)
+            print("ADVERTENCIA: APP_URL apunta a localhost/127.0.0.1")
+            print("=" * 60)
+            print(f"APP_URL actual: {base_url}")
+            print("El tracking de aperturas y clics NO funcionara en moviles.")
+            print("Soluciones:")
+            print(" 1) Usar tu IP local de red (ej: http://192.168.1.50:8000)")
+            print("    y abrir el correo en moviles conectados al mismo WiFi.")
+            print(" 2) Usar ngrok: 'ngrok http 8000' y poner la URL https en .env")
+            print(" 3) Desplegar a un dominio publico con HTTPS.")
+            print("=" * 60)
         
         print(f"Configuracion cargada:")
         print(f"- Sender: {sender}")
@@ -153,27 +170,44 @@ def main():
                 # o si son pasados directamente como ya decodificados del entorno
                 email_subject = recipient_data['subject']
                 email_description = recipient_data['description']
-                
-                # Construir URLs de seguimiento con el email del destinatario
-                personalized_click_url = click_url.replace('{email}', email)
-                personalized_open_url = open_url.replace('{email}', email)
+
+                # URL-encode el email para que caracteres como '+' no rompan la URL.
+                # Importante: usar safe='' para que '@' tambien se codifique como %40.
+                email_safe = url_quote(email, safe='')
+
+                # Construir URLs de seguimiento con el email codificado
+                personalized_click_url = click_url.replace('{email}', email_safe)
+                personalized_open_url = open_url.replace('{email}', email_safe)
 
                 # SIEMPRE usar el enlace de tracking, no el link_redirection directo
                 final_redirect_url = personalized_click_url
 
+                # =====================================================
+                # PIXEL DE TRACKING - Optimizado para compatibilidad movil
+                # =====================================================
+                # Cambios clave vs version anterior:
+                #  - NO se usa display:none (muchos clientes moviles bloquean
+                #    imagenes ocultas por considerarlas sospechosas de tracking).
+                #  - Se posiciona ANTES del contenido principal: si la imagen
+                #    principal tarda o falla, el pixel ya se cargo.
+                #  - Atributos inline (width, height, border, alt) para maxima
+                #    compatibilidad con clientes de correo viejos.
+                #  - Estilos defensivos: line-height, font-size, outline en 0
+                #    para que el pixel ocupe realmente 1x1 sin afectar layout.
+                # =====================================================
                 html_content_with_email = f'''
                 <html>
-                  <body>
+                  <body style="margin:0;padding:0;">
+                    <img src="{personalized_open_url}" width="1" height="1" alt="" border="0" style="display:block;width:1px;height:1px;border:0;outline:none;text-decoration:none;line-height:1px;font-size:1px;margin:0;padding:0;" />
                     <p>{email_description}</p>
                     <p>Haz clic en la imagen:</p>
                     <a href="{final_redirect_url}">
                       <img src="cid:image1" alt="Imagen" style="width:300px;">
                     </a>
-                    <img src="{personalized_open_url}" width="1" height="1" style="display:none;">
                   </body>
                 </html>
                 '''
-                
+
                 send_email(sender, password, email, email_subject, html_content_with_email, image_path)
                 print(f"Email enviado a: {email} - Asunto: {email_subject}")
                 successful_sends += 1

@@ -265,23 +265,36 @@ class EstadisticasController extends Controller
     }
 
     /**
-     * Registra la apertura de un correo
+     * Registra la apertura de un correo mediante un pixel de seguimiento.
+     *
+     * Cambios respecto a la versión original:
+     * - Decodifica el email por si viene URL-encoded (móviles usan más codificación).
+     * - Registra el User-Agent y la IP para diferenciar aperturas reales de proxies.
+     * - Detecta el proxy de Apple Mail Privacy Protection (MPP) y lo marca en el log.
+     * - Devuelve headers anti-caché agresivos (Cache-Control, Pragma, Expires, Last-Modified)
+     *   para evitar que Gmail/Apple/proxies sirvan el pixel desde caché y se pierdan aperturas.
+     * - Añade Content-Length para mejor compatibilidad con clientes estrictos.
      */
     public function trackOpen($id_img, $email)
     {
-        // Log de entrada a la función trackOpen
+        // Decodificar el email por si viene URL-encoded (ej. "user%40dominio.com")
+        $email = urldecode($email);
+
+        $userAgent = request()->userAgent();
+        $ip = request()->ip();
+        $isMobile = $this->isMobileDevice($userAgent);
+        $isAppleProxy = $this->isAppleMailProxy($ip, $userAgent);
+
         \Log::info('trackOpen: Iniciando seguimiento de apertura.', [
             'id_img' => $id_img,
             'email' => $email,
-            'ip_address' => request()->ip()
+            'ip_address' => $ip,
+            'user_agent' => $userAgent,
+            'is_mobile' => $isMobile,
+            'is_apple_proxy' => $isAppleProxy,
         ]);
 
         $imageId = $id_img;
-
-        \Log::info('trackOpen: Parámetros recibidos', [
-            'email' => $email,
-            'imageId' => $imageId
-        ]);
 
         // Verificar si ya existe un registro para este email y esta imagen
         $existingClick = Click::where('email', $email)
@@ -289,15 +302,25 @@ class EstadisticasController extends Controller
                               ->first();
 
         if ($existingClick) {
-            // Si ya existe, actualizamos solo la fecha de apertura
-            $existingClick->update([
-                'email_opened_at' => now()
-            ]);
-            \Log::info('trackOpen: Registro de apertura existente actualizado.', [
-                'id' => $existingClick->id,
-                'email' => $existingClick->email,
-                'email_opened_at' => $existingClick->email_opened_at
-            ]);
+            // Solo registramos la PRIMERA apertura real para no sobrescribirla con re-aperturas.
+            // Si quieres registrar todas las aperturas, cambia la condición.
+            if (!$existingClick->email_opened_at) {
+                $existingClick->update([
+                    'email_opened_at' => now(),
+                    'ip_address' => $existingClick->ip_address ?: $ip,
+                ]);
+                \Log::info('trackOpen: Primera apertura registrada.', [
+                    'id' => $existingClick->id,
+                    'email' => $existingClick->email,
+                    'email_opened_at' => $existingClick->email_opened_at,
+                ]);
+            } else {
+                \Log::info('trackOpen: Re-apertura detectada (no se sobrescribe la primera).', [
+                    'id' => $existingClick->id,
+                    'email' => $existingClick->email,
+                    'first_open' => $existingClick->email_opened_at,
+                ]);
+            }
         } else {
             // Determinar el siguiente id_person para esta imagen
             $maxIdPerson = Click::where('id_img', $imageId)->max('id_person') ?? 0;
@@ -306,21 +329,69 @@ class EstadisticasController extends Controller
             // Crear registro solo con la apertura
             $newClick = Click::create([
                 'email' => $email,
+                'ip_address' => $ip,
                 'id_img' => $imageId,
                 'id_person' => $idPerson,
-                'email_sent_at' => now(), // Se considera que el correo fue enviado en este momento
-                'email_opened_at' => now() // Registrar la apertura del correo
+                'email_sent_at' => now(),     // Se considera enviado en este momento si no hay registro previo
+                'email_opened_at' => now(),
             ]);
             \Log::info('trackOpen: Nuevo registro de apertura creado.', [
                 'id' => $newClick->id,
                 'email' => $newClick->email,
-                'email_opened_at' => $newClick->email_opened_at
+                'email_opened_at' => $newClick->email_opened_at,
             ]);
         }
 
-        // Devolver una imagen transparente de 1x1 pixel
+        // Pixel GIF transparente 1x1
         $img = base64_decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7');
-        return response($img)->header('Content-Type', 'image/gif');
+
+        // Headers anti-caché agresivos.
+        // Sin estos, Gmail (que proxifica imágenes vía googleusercontent.com) y los clientes
+        // móviles cachean el pixel: el correo puede abrirse N veces y solo registramos 1
+        // (o ninguna si se sirve desde caché edge). Forzamos revalidación en cada apertura.
+        return response($img, 200)
+            ->header('Content-Type', 'image/gif')
+            ->header('Content-Length', (string) strlen($img))
+            ->header('Cache-Control', 'no-store, no-cache, must-revalidate, private, max-age=0')
+            ->header('Pragma', 'no-cache')
+            ->header('Expires', 'Mon, 26 Jul 1997 05:00:00 GMT')
+            ->header('Last-Modified', gmdate('D, d M Y H:i:s') . ' GMT')
+            ->header('X-Content-Type-Options', 'nosniff');
+    }
+
+    /**
+     * Detecta si la solicitud proviene del proxy de Apple Mail Privacy Protection.
+     *
+     * Desde iOS 15 / macOS Monterey, Apple precarga TODAS las imágenes de correos
+     * desde su propio rango de IPs (17.0.0.0/8). Esto genera "aperturas" que en
+     * realidad son precargas automáticas y no significan que el usuario abrió el correo.
+     * Lo registramos en logs para poder filtrarlo en estadísticas si hace falta.
+     */
+    private function isAppleMailProxy($ip, $userAgent)
+    {
+        if (!$ip) return false;
+
+        // El rango principal de Apple es 17.0.0.0/8.
+        // (Apple publica los rangos completos; este es el más amplio y cubre MPP.)
+        if ($this->ipInRange($ip, '17.0.0.0', 8)) {
+            return true;
+        }
+
+        return false;
+    }
+
+    /**
+     * Verifica si una IP (IPv4) está dentro de un rango CIDR dado.
+     */
+    private function ipInRange($ip, $subnet, $bits)
+    {
+        $ipLong = ip2long($ip);
+        $subnetLong = ip2long($subnet);
+        if ($ipLong === false || $subnetLong === false) {
+            return false;
+        }
+        $mask = -1 << (32 - (int) $bits);
+        return ($ipLong & $mask) === ($subnetLong & $mask);
     }
 
     private function determinarMunicipio($cityName)
@@ -424,7 +495,39 @@ class EstadisticasController extends Controller
                     'message' => 'Error al enviar el correo: ' . implode("\n", $output)
                 ], 500);
             }
-            
+
+            // Verificar que el script Python realmente envió el correo
+            // (puede devolver returnCode 0 pero haber fallado el SMTP por ejemplo)
+            $outputStr = implode("\n", $output);
+            $sentSuccessfully = $this->emailWasSentSuccessfully($outputStr, $email);
+
+            if (!$sentSuccessfully) {
+                \Log::warning('sendTestEmail: El script terminó OK pero el envío SMTP parece haber fallado', [
+                    'email' => $email,
+                    'output' => $output
+                ]);
+                return response()->json([
+                    'success' => false,
+                    'message' => 'El script ejecutó pero el envío SMTP falló. Revisa el log de Python.',
+                    'output' => $output
+                ], 500);
+            }
+
+            // Registrar el envío en BD ANTES de que el destinatario abra/clickee.
+            // Esto es clave para que las métricas de tasa de apertura sean reales:
+            // sin este registro, solo contaríamos a quienes interactuaron.
+            $maxIdPerson = Click::where('id_img', $image->id)->max('id_person') ?? 0;
+            Click::firstOrCreate(
+                [
+                    'email' => $email,
+                    'id_img' => $image->id,
+                ],
+                [
+                    'id_person' => $maxIdPerson + 1,
+                    'email_sent_at' => now(),
+                ]
+            );
+
             return response()->json([
                 'success' => true,
                 'message' => 'Correo enviado exitosamente a ' . $email
@@ -706,24 +809,49 @@ class EstadisticasController extends Controller
                     'message' => 'Error al enviar los correos: ' . implode("\n", $output)
                 ], 500);
             }
-            
-            // Registrar envíos en BD
+
+            // Parsear el output del script Python para identificar QUÉ emails
+            // se enviaron realmente. El script reporta cada éxito con una línea:
+            //   "Email enviado a: usuario@dominio.com - Asunto: ..."
+            // Y cada error con:
+            //   "Error al enviar email a usuario@dominio.com: ..."
+            $outputStr = implode("\n", $output);
+            $successfulEmails = $this->parseSuccessfulEmails($outputStr);
+            $failedEmails = $this->parseFailedEmails($outputStr);
+
+            \Log::info('sendBulkEmail: Resultados parseados', [
+                'total_destinatarios' => count($emailData),
+                'enviados_ok' => count($successfulEmails),
+                'fallidos' => count($failedEmails),
+                'failed_list' => $failedEmails,
+            ]);
+
+            // Registrar SOLO los envíos exitosos en BD.
+            // Antes se registraban todos, lo que inflaba el contador cuando el SMTP fallaba.
             $now = now();
             $maxIdPerson = Click::where('id_img', $image->id)->max('id_person') ?? 0;
-            
-            foreach ($emailData as $index => $emailInfo) {
-                Click::create([
-                    'email' => $emailInfo['email'],
-                    'id_img' => $image->id,
-                    'id_person' => $maxIdPerson + $index + 1,
-                    'email_sent_at' => $now
-                ]);
+            $registered = 0;
+
+            foreach ($successfulEmails as $index => $sentEmail) {
+                Click::firstOrCreate(
+                    [
+                        'email' => $sentEmail,
+                        'id_img' => $image->id,
+                    ],
+                    [
+                        'id_person' => $maxIdPerson + $index + 1,
+                        'email_sent_at' => $now,
+                    ]
+                );
+                $registered++;
             }
-            
+
             return response()->json([
                 'success' => true,
-                'message' => 'Campaña masiva enviada exitosamente a ' . count($validEmails) . ' correos',
-                'total' => count($validEmails)
+                'message' => 'Campaña enviada. ' . $registered . ' de ' . count($emailData) . ' correos enviados exitosamente.',
+                'total' => $registered,
+                'failed' => count($failedEmails),
+                'failed_emails' => $failedEmails,
             ]);
             
         } catch (\Exception $e) {
@@ -967,27 +1095,45 @@ class EstadisticasController extends Controller
                     'message' => 'Error al enviar los correos: ' . implode("\n", $output)
                 ], 500);
             }
-            
-            // Registrar los envíos en la tabla clicks
+
+            // Parsear output Python para identificar enviados vs fallidos
+            // (mismo motivo que en sendBulkEmail: returnCode 0 no garantiza envío SMTP).
+            $outputStr = implode("\n", $output);
+            $successfulEmails = $this->parseSuccessfulEmails($outputStr);
+            $failedEmails = $this->parseFailedEmails($outputStr);
+
+            \Log::info('uploadEmailList: Resultados parseados', [
+                'total_destinatarios' => count($emailData),
+                'enviados_ok' => count($successfulEmails),
+                'fallidos' => count($failedEmails),
+            ]);
+
+            // Registrar SOLO los envíos exitosos en BD
             $now = now();
-            
-            // Determinar el siguiente id_person para esta imagen
             $maxIdPerson = Click::where('id_img', $image->id)->max('id_person') ?? 0;
-            
-            foreach ($emailData as $index => $emailInfo) {
-                Click::create([
-                    'email' => $emailInfo['email'],
-                    'id_img' => $image->id,
-                    'id_person' => $maxIdPerson + $index + 1,
-                    'email_sent_at' => $now
-                ]);
+            $registered = 0;
+
+            foreach ($successfulEmails as $index => $sentEmail) {
+                Click::firstOrCreate(
+                    [
+                        'email' => $sentEmail,
+                        'id_img' => $image->id,
+                    ],
+                    [
+                        'id_person' => $maxIdPerson + $index + 1,
+                        'email_sent_at' => $now,
+                    ]
+                );
+                $registered++;
             }
-            
+
             // Respuesta exitosa
             return response()->json([
                 'success' => true,
-                'message' => 'Correos enviados exitosamente',
-                'total' => count($emailData)
+                'message' => 'Correos enviados. ' . $registered . ' de ' . count($emailData) . ' exitosos.',
+                'total' => $registered,
+                'failed' => count($failedEmails),
+                'failed_emails' => $failedEmails,
             ]);
             
         } catch (\Exception $e) {
@@ -1169,12 +1315,32 @@ class EstadisticasController extends Controller
 
             $performanceData = [];
             foreach ($campaigns as $campaign) {
-                $totalSent = $campaign->clicks->count();
-                $totalOpened = $campaign->clicks->whereNotNull('email_opened_at')->count();
-                $totalClicked = $campaign->clicks->whereNotNull('clicked_at')->count();
+                // Contar correctamente:
+                // - total_sent: registros con email_sent_at NO NULL
+                //   (antes contaba TODOS los registros, incluidos los que solo
+                //    se crearon al abrir/clickear sin un envío real registrado).
+                // - emails únicos para no duplicar por reenvíos.
+                $totalSent = $campaign->clicks
+                    ->whereNotNull('email_sent_at')
+                    ->unique('email')
+                    ->count();
 
+                $totalOpened = $campaign->clicks
+                    ->whereNotNull('email_opened_at')
+                    ->unique('email')
+                    ->count();
+
+                $totalClicked = $campaign->clicks
+                    ->whereNotNull('clicked_at')
+                    ->unique('email')
+                    ->count();
+
+                // Tasa de apertura: abiertos / enviados
                 $openRate = $totalSent > 0 ? ($totalOpened / $totalSent) * 100 : 0;
-                $clickRate = $totalOpened > 0 ? ($totalClicked / $totalOpened) * 100 : 0; // Click rate of opened emails
+                // Tasa de clic (CTR): clickeados / enviados (más útil que clic/abierto)
+                $clickRate = $totalSent > 0 ? ($totalClicked / $totalSent) * 100 : 0;
+                // Tasa clic-a-apertura: cuánto de los que abrieron también hizo clic
+                $clickToOpenRate = $totalOpened > 0 ? ($totalClicked / $totalOpened) * 100 : 0;
 
                 $performanceData[] = [
                     'campaign_id' => $campaign->id,
@@ -1188,6 +1354,7 @@ class EstadisticasController extends Controller
                     'total_clicked' => $totalClicked,
                     'open_rate' => round($openRate, 2),
                     'click_rate' => round($clickRate, 2),
+                    'click_to_open_rate' => round($clickToOpenRate, 2),
                 ];
             }
 
@@ -1242,6 +1409,16 @@ class EstadisticasController extends Controller
                 500,
                 0.7
             );
+
+            // Verificar si hay error en la respuesta
+            if (isset($aiResponse['error'])) {
+                \Log::error('AI Predictions Error:', ['error' => $aiResponse['error']]);
+                return response()->json([
+                    'success' => false,
+                    'message' => $aiResponse['error']['message'],
+                    'error' => $aiResponse['error']
+                ], 500);
+            }
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
@@ -1312,17 +1489,27 @@ class EstadisticasController extends Controller
 
             \Log::info('AI Agent Response (Raw):', ['response' => $aiResponse]);
 
+            // Verificar si hay error en la respuesta
+            if (isset($aiResponse['error'])) {
+                \Log::error('AI Agent Error:', ['error' => $aiResponse['error']]);
+                return response()->json([
+                    'success' => false,
+                    'message' => $aiResponse['error']['message'],
+                    'error' => $aiResponse['error']
+                ], 500);
+            }
+
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
                     'success' => true,
                     'response' => $aiResponse['choices'][0]['message']['content']
                 ]);
             } else {
-                \Log::error('AI Agent: No content in OpenAI response.', ['raw_response' => $aiResponse]);
+                \Log::error('AI Agent: No content in response.', ['raw_response' => $aiResponse]);
                 return response()->json([
                     'success' => false,
                     'message' => 'No se pudo obtener una respuesta válida de la IA. Por favor, verifica los logs para más detalles.',
-                    'error' => $aiResponse // Include the full response for client-side debugging if needed
+                    'error' => $aiResponse
                 ], 500);
             }
 
@@ -1373,6 +1560,16 @@ class EstadisticasController extends Controller
                 800,
                 0.7
             );
+
+            // Verificar si hay error en la respuesta
+            if (isset($aiResponse['error'])) {
+                \Log::error('AI Recommendations Error:', ['error' => $aiResponse['error']]);
+                return response()->json([
+                    'success' => false,
+                    'message' => $aiResponse['error']['message'],
+                    'error' => $aiResponse['error']
+                ], 500);
+            }
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
@@ -1425,6 +1622,16 @@ class EstadisticasController extends Controller
                 0.7
             );
 
+            // Verificar si hay error en la respuesta
+            if (isset($aiResponse['error'])) {
+                \Log::error('AI Email Content Error:', ['error' => $aiResponse['error']]);
+                return response()->json([
+                    'success' => false,
+                    'message' => $aiResponse['error']['message'],
+                    'error' => $aiResponse['error']
+                ], 500);
+            }
+
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
                     'success' => true,
@@ -1447,6 +1654,246 @@ class EstadisticasController extends Controller
         }
     }
 
+    /* ====================================================================
+     * RECOMENDACIÓN DE HORARIOS ÓPTIMOS DE ENVÍO
+     *
+     * Estos métodos analizan las aperturas históricas (campo email_opened_at
+     * de la tabla clicks) y las agrupan por hora del día y día de la semana.
+     * Luego le pasan esos datos a la IA para que recomiende cuándo enviar
+     * la próxima campaña.
+     * ====================================================================*/
+
+    /**
+     * Endpoint público que devuelve estadísticas de aperturas por hora/día.
+     * Útil para alimentar gráficas en el frontend o para auditar los datos
+     * que se le pasan a la IA.
+     */
+    public function getOpenStatsByTime()
+    {
+        try {
+            $data = $this->computeOpenStatsByTime();
+            return response()->json([
+                'success' => true,
+                'timezone' => config('app.timezone'),
+                'data' => $data,
+            ]);
+        } catch (\Exception $e) {
+            \Log::error('getOpenStatsByTime error', ['message' => $e->getMessage()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error obteniendo estadísticas por hora: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Endpoint que arma un prompt con las estadísticas por hora/día y pide
+     * a la IA una recomendación concreta de horarios óptimos de envío.
+     */
+    public function getOptimalSendTimeRecommendation()
+    {
+        try {
+            $stats = $this->computeOpenStatsByTime();
+
+            // Si no hay datos suficientes, evitamos llamar a la IA con vacío.
+            if ($stats['total_opens'] < 5) {
+                return response()->json([
+                    'success' => false,
+                    'message' => 'No hay suficientes aperturas registradas para generar una recomendación basada en datos. Se necesitan al menos 5 aperturas. Actual: ' . $stats['total_opens'] . '.',
+                    'data' => $stats,
+                ], 400);
+            }
+
+            // Construir un prompt rico en datos para la IA.
+            $prompt = $this->buildSendTimePrompt($stats);
+
+            \Log::info('Optimal Send Time Prompt:', ['prompt' => $prompt]);
+
+            $aiResponse = $this->createChatCompletion(
+                'Eres un experto en email marketing y análisis de datos. Tu trabajo es analizar patrones de apertura de correos y recomendar los mejores horarios y días para enviar campañas. Responde SIEMPRE en español, de forma clara, estructurada y accionable. Justifica tus recomendaciones con los datos provistos.',
+                $prompt,
+                700,
+                0.5  // Más bajo que en otros endpoints porque queremos respuestas basadas en datos, no creativas.
+            );
+
+            if (isset($aiResponse['error'])) {
+                return response()->json([
+                    'success' => false,
+                    'message' => $aiResponse['error']['message'],
+                    'error' => $aiResponse['error'],
+                    'data' => $stats,
+                ], 500);
+            }
+
+            if (isset($aiResponse['choices'][0]['message']['content'])) {
+                return response()->json([
+                    'success' => true,
+                    'recommendation' => $aiResponse['choices'][0]['message']['content'],
+                    'data' => $stats,
+                ]);
+            }
+
+            return response()->json([
+                'success' => false,
+                'message' => 'No se obtuvo respuesta válida de la IA.',
+                'error' => $aiResponse,
+                'data' => $stats,
+            ], 500);
+
+        } catch (\Exception $e) {
+            \Log::error('getOptimalSendTimeRecommendation error', [
+                'message' => $e->getMessage(),
+                'trace' => $e->getTraceAsString(),
+            ]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al generar recomendación: ' . $e->getMessage(),
+            ], 500);
+        }
+    }
+
+    /**
+     * Calcula las estadísticas de aperturas agrupadas por hora del día (0-23)
+     * y día de la semana (0=Domingo, 6=Sábado).
+     *
+     * Devuelve también totales y el "top 3" de mejores horarios/días.
+     */
+    private function computeOpenStatsByTime(): array
+    {
+        // Traer todas las aperturas con su timestamp.
+        $opens = Click::whereNotNull('email_opened_at')
+            ->select('email_opened_at')
+            ->get();
+
+        // Zona horaria objetivo: la configurada en config/app.php
+        // (recomendado poner APP_TIMEZONE=America/Mexico_City en .env).
+        // Esto es CRÍTICO: si la BD guarda en UTC y aquí no convertimos,
+        // un correo abierto a las 14:00 hora local aparecería como 20:00 UTC
+        // y la IA recomendaría malos horarios.
+        $appTz = config('app.timezone', 'UTC');
+
+        // Inicializar matrices con ceros para que la salida sea siempre completa
+        $byHour = array_fill(0, 24, 0);
+        $byDayOfWeek = array_fill(0, 7, 0); // 0=Dom, 6=Sáb
+        $byDayHour = [];
+
+        foreach ($opens as $click) {
+            $ts = $click->email_opened_at;
+            if (!$ts) continue;
+
+            // Carbon ya convierte si la zona horaria está configurada bien.
+            // setTimezone() asegura que la conversión sea explícita.
+            $local = $ts->copy()->setTimezone($appTz);
+
+            $hour = (int) $local->format('G');
+            $dow = (int) $local->format('w');
+
+            $byHour[$hour]++;
+            $byDayOfWeek[$dow]++;
+
+            $key = $dow . '-' . $hour;
+            $byDayHour[$key] = ($byDayHour[$key] ?? 0) + 1;
+        }
+
+        // Mejores 3 horas
+        $topHours = $byHour;
+        arsort($topHours);
+        $topHours = array_slice($topHours, 0, 3, true);
+
+        // Mejores 3 días
+        $topDays = $byDayOfWeek;
+        arsort($topDays);
+        $topDays = array_slice($topDays, 0, 3, true);
+
+        // Mejores 5 combinaciones día+hora
+        arsort($byDayHour);
+        $topSlots = array_slice($byDayHour, 0, 5, true);
+
+        $dayNames = ['Domingo', 'Lunes', 'Martes', 'Miércoles', 'Jueves', 'Viernes', 'Sábado'];
+
+        return [
+            'total_opens' => $opens->count(),
+            'timezone' => $appTz,
+            'by_hour' => $byHour,
+            'by_day_of_week' => array_combine($dayNames, $byDayOfWeek),
+            'top_hours' => $this->formatTopHours($topHours),
+            'top_days' => $this->formatTopDays($topDays, $dayNames),
+            'top_slots' => $this->formatTopSlots($topSlots, $dayNames),
+        ];
+    }
+
+    private function formatTopHours(array $topHours): array
+    {
+        $out = [];
+        foreach ($topHours as $hour => $count) {
+            $out[] = [
+                'hour' => sprintf('%02d:00 - %02d:59', $hour, $hour),
+                'opens' => $count,
+            ];
+        }
+        return $out;
+    }
+
+    private function formatTopDays(array $topDays, array $dayNames): array
+    {
+        $out = [];
+        foreach ($topDays as $dow => $count) {
+            $out[] = ['day' => $dayNames[$dow], 'opens' => $count];
+        }
+        return $out;
+    }
+
+    private function formatTopSlots(array $topSlots, array $dayNames): array
+    {
+        $out = [];
+        foreach ($topSlots as $key => $count) {
+            [$dow, $hour] = explode('-', $key);
+            $out[] = [
+                'day' => $dayNames[(int) $dow],
+                'hour' => sprintf('%02d:00', (int) $hour),
+                'opens' => $count,
+            ];
+        }
+        return $out;
+    }
+
+    /**
+     * Arma el prompt que se le envía a la IA con los datos crudos.
+     */
+    private function buildSendTimePrompt(array $stats): string
+    {
+        $tz = $stats['timezone'];
+        $prompt = "Análisis de patrones de apertura de correos electrónicos.\n";
+        $prompt .= "Zona horaria de los datos: {$tz}\n";
+        $prompt .= "Total de aperturas registradas: {$stats['total_opens']}\n\n";
+
+        $prompt .= "Aperturas por hora del día (formato 24h):\n";
+        foreach ($stats['by_hour'] as $hour => $count) {
+            if ($count > 0) {
+                $prompt .= sprintf("  %02d:00 - %02d:59 → %d aperturas\n", $hour, $hour, $count);
+            }
+        }
+
+        $prompt .= "\nAperturas por día de la semana:\n";
+        foreach ($stats['by_day_of_week'] as $day => $count) {
+            $prompt .= "  {$day}: {$count} aperturas\n";
+        }
+
+        $prompt .= "\nMejores 5 combinaciones día + hora:\n";
+        foreach ($stats['top_slots'] as $slot) {
+            $prompt .= "  {$slot['day']} a las {$slot['hour']} → {$slot['opens']} aperturas\n";
+        }
+
+        $prompt .= "\nBasándote ESTRICTAMENTE en estos datos:\n";
+        $prompt .= "1. Identifica los 2 o 3 mejores horarios para enviar campañas y explica por qué.\n";
+        $prompt .= "2. Identifica los peores horarios que conviene evitar.\n";
+        $prompt .= "3. Sugiere el día y hora exacta para una próxima campaña.\n";
+        $prompt .= "4. Advierte si los datos son escasos o tienen sesgos visibles (ej. concentrados en un solo día).\n";
+        $prompt .= "Formato: usa viñetas y sé concreto. No inventes datos que no estén arriba.\n";
+
+        return $prompt;
+    }
+
     /**
      * Cliente genérico para APIs compatibles con OpenAI (LM Studio local, etc.)
      */
@@ -1454,23 +1901,137 @@ class EstadisticasController extends Controller
     {
         $baseUrl = rtrim(env('LLM_BASE_URL', 'http://localhost:1234/v1'), '/');
         $apiKey = env('LLM_API_KEY', 'lm-studio'); // LM Studio acepta cualquier valor
-        $model = env('LLM_MODEL', 'deepseek-r1:latest');
+        $model = env('LLM_MODEL', 'deepseek-r1-0528-qwen3-8b');
 
         $endpoint = $baseUrl . '/chat/completions';
 
-        $response = Http::withHeaders([
-            'Authorization' => 'Bearer ' . $apiKey,
-            'Content-Type' => 'application/json',
-        ])->timeout(60)->post($endpoint, [
+        \Log::info('AI Request Details:', [
+            'endpoint' => $endpoint,
             'model' => $model,
-            'messages' => [
-                ['role' => 'system', 'content' => $systemPrompt],
-                ['role' => 'user', 'content' => $userPrompt]
-            ],
             'max_tokens' => $maxTokens,
-            'temperature' => $temperature,
+            'temperature' => $temperature
         ]);
 
-        return $response->json();
+        try {
+            $response = Http::withHeaders([
+                'Authorization' => 'Bearer ' . $apiKey,
+                'Content-Type' => 'application/json',
+            ])->timeout(120)->post($endpoint, [
+                'model' => $model,
+                'messages' => [
+                    ['role' => 'system', 'content' => $systemPrompt],
+                    ['role' => 'user', 'content' => $userPrompt]
+                ],
+                'max_tokens' => $maxTokens,
+                'temperature' => $temperature,
+            ]);
+
+            \Log::info('AI Response Status:', [
+                'status' => $response->status(),
+                'successful' => $response->successful()
+            ]);
+
+            if ($response->successful()) {
+                $data = $response->json();
+                \Log::info('AI Response Data:', ['data' => $data]);
+                return $data;
+            } else {
+                \Log::error('AI Request Failed:', [
+                    'status' => $response->status(),
+                    'body' => $response->body(),
+                    'headers' => $response->headers()
+                ]);
+                
+                return [
+                    'error' => [
+                        'message' => 'Error en la respuesta del servidor de IA',
+                        'status' => $response->status(),
+                        'body' => $response->body()
+                    ]
+                ];
+            }
+        } catch (\Illuminate\Http\Client\ConnectionException $e) {
+            \Log::error('AI Connection Error:', ['message' => $e->getMessage()]);
+            return [
+                'error' => [
+                    'message' => 'No se pudo conectar con LM Studio. Verifica que esté ejecutándose en http://localhost:1234',
+                    'type' => 'connection_error'
+                ]
+            ];
+        } catch (\Illuminate\Http\Client\RequestException $e) {
+            \Log::error('AI Request Error:', ['message' => $e->getMessage()]);
+            return [
+                'error' => [
+                    'message' => 'Error en la petición a la IA: ' . $e->getMessage(),
+                    'type' => 'request_error'
+                ]
+            ];
+        } catch (\Exception $e) {
+            \Log::error('AI General Error:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return [
+                'error' => [
+                    'message' => 'Error inesperado: ' . $e->getMessage(),
+                    'type' => 'general_error'
+                ]
+            ];
+        }
+    }
+
+    /* ====================================================================
+     * HELPERS PARA PARSEAR EL OUTPUT DEL SCRIPT generar_emails.py
+     *
+     * El script imprime líneas de éxito como:
+     *   "Email enviado a: usuario@dominio.com - Asunto: ..."
+     * Y líneas de error como:
+     *   "Error al enviar email a usuario@dominio.com: ..."
+     *
+     * Antes registrábamos TODOS los destinatarios como enviados en la BD,
+     * incluso cuando el SMTP fallaba (return code 0 pero 0 correos enviados).
+     * Ahora parseamos para registrar sólo los que realmente salieron.
+     * ====================================================================*/
+
+    /**
+     * Extrae los emails enviados exitosamente del output del script Python.
+     */
+    private function parseSuccessfulEmails(string $output): array
+    {
+        $emails = [];
+        // Regex: captura el email después de "Email enviado a:"
+        if (preg_match_all('/Email enviado a:\s*([^\s]+@[^\s\-]+)/i', $output, $matches)) {
+            foreach ($matches[1] as $email) {
+                $email = trim($email);
+                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $emails[] = $email;
+                }
+            }
+        }
+        return array_values(array_unique($emails));
+    }
+
+    /**
+     * Extrae los emails que fallaron del output del script Python.
+     */
+    private function parseFailedEmails(string $output): array
+    {
+        $emails = [];
+        if (preg_match_all('/Error al enviar email a\s+([^\s:]+@[^\s:]+)/i', $output, $matches)) {
+            foreach ($matches[1] as $email) {
+                $email = trim($email);
+                if (filter_var($email, FILTER_VALIDATE_EMAIL)) {
+                    $emails[] = $email;
+                }
+            }
+        }
+        return array_values(array_unique($emails));
+    }
+
+    /**
+     * Verifica si un email específico aparece como enviado exitosamente.
+     * Útil para sendTestEmail donde solo hay un destinatario.
+     */
+    private function emailWasSentSuccessfully(string $output, string $email): bool
+    {
+        $successful = $this->parseSuccessfulEmails($output);
+        return in_array(strtolower(trim($email)), array_map('strtolower', $successful), true);
     }
 }
