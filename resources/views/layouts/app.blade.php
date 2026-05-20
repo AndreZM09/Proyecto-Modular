@@ -46,7 +46,12 @@
     <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.0-alpha1/dist/js/bootstrap.bundle.min.js"></script>
     <!-- jQuery -->
     <script src="https://code.jquery.com/jquery-3.6.0.min.js"></script>
-    
+
+    {{-- Asistente IA disponible en todas las vistas que usen este layout.
+         Para ocultarlo en una vista específica, define
+         @php $hideChatbot = true; @endphp antes del @yield. --}}
+    @include('partials.chatbot')
+
     <!-- Scripts adicionales -->
     @stack('scripts')
 </body>

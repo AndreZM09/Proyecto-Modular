@@ -17,6 +17,14 @@ Route::get('/', function () {
 
 //ruta de campañas (imagenes enviadas en bd)
 Route::get('/campañas', [CampañasController::class, 'index'])->name('campañas');
+// Eliminar una campaña (registro + clicks + imagen del disco)
+// Usamos URL ASCII pura "/campaigns/{id}" en vez de "/campañas/{id}" porque
+// el caracter ñ en URLs puede ser codificado de forma inconsistente por
+// los navegadores en peticiones fetch, lo que hace que Laravel a veces no
+// encuentre el match de la ruta.
+Route::delete('/campaigns/{id}', [CampañasController::class, 'destroy'])
+    ->where('id', '[0-9]+')
+    ->name('campañas.destroy');
 
 // Ruta para mostrar el formulario de login
 Route::get('/login', [LoginController::class, 'showLoginForm'])->name('login');

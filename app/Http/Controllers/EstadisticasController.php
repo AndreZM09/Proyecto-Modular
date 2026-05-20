@@ -1441,85 +1441,412 @@ class EstadisticasController extends Controller
         }
     }
 
+    /**
+     * Endpoint principal del chatbot.
+     *
+     * Mejoras vs versión original:
+     *  1) Detección de intención (intent) por keywords → solo inyectamos el
+     *     contexto relevante a cada pregunta (horarios / campaña específica /
+     *     general). Antes mandábamos TODO el histórico siempre, lo que hacía
+     *     que el LLM tardara más y a veces se confundiera.
+     *  2) Soporte de streaming (SSE) → si el cliente envía "stream=true", la
+     *     respuesta llega token-por-token y la UX se siente instantánea aunque
+     *     la generación total tarde lo mismo.
+     *  3) max_tokens reducido (400) y temperature más baja (0.4) → respuestas
+     *     más rápidas y centradas en los datos, no creativas.
+     *  4) System prompt más estricto: "responde solo con los datos provistos,
+     *     no inventes". Esto reduce alucinaciones.
+     */
     public function askAIAboutCampaigns(Request $request)
     {
         try {
             $request->validate([
-                'question' => 'required|string|max:1000'
+                'question' => 'required|string|max:1000',
+                'stream'   => 'sometimes|boolean',
             ]);
 
-            $userQuestion = $request->input('question');
+            $userQuestion = trim($request->input('question'));
+            $useStream    = $request->boolean('stream', false);
 
-            // Obtener datos históricos de las campañas (reutilizando la lógica existente)
-            $campaignPerformanceResponse = $this->getCampaignPerformance();
-            $campaignPerformanceData = json_decode($campaignPerformanceResponse->getContent(), true)['data'];
+            // 1) Detectar el tipo de pregunta para inyectar el contexto correcto.
+            $intent = $this->detectQuestionIntent($userQuestion);
+            \Log::info('Chatbot: intent detectado', ['intent' => $intent, 'question' => $userQuestion]);
 
-            $contextData = "";
-            if (!empty($campaignPerformanceData)) {
-                $contextData .= "Aquí están los datos históricos de mis campañas de email marketing:\n\n";
-                foreach ($campaignPerformanceData as $campaign) {
-                    // Ensure to report what data is actually available.
-                    // If 'email_opened_at' and 'clicked_at' are consistently NULL,
-                    // then open_rate and click_rate will be 0.
-                    $contextData .= "Campaña ID: {$campaign['campaign_id']}\n";
-                    $contextData .= "  Asunto: \"{$campaign['subject']}\"\n";
-                    $contextData .= "  Descripción: \"{$campaign['description']}\"\n";
-                    $contextData .= "  Enviados: {$campaign['total_sent']}\n";
-                    $contextData .= "  Abiertos: {$campaign['total_opened']}\n";
-                    $contextData .= "  Clics: {$campaign['total_clicked']}\n";
-                    $contextData .= "  Tasa de Apertura: {$campaign['open_rate']}%\n";
-                    $contextData .= "  Tasa de Clic (de abiertos): {$campaign['click_rate']}%\n\n";
-                }
-                $contextData .= "Basándote en estos datos, responde a la siguiente pregunta: \n";
-            } else {
-                $contextData .= "No hay datos históricos de campañas disponibles. Solo tengo información general. Por favor, ten esto en cuenta al responder.\n\n";
+            // 2) Construir contexto MÍNIMO necesario según el intent.
+            $context = $this->buildContextForIntent($intent, $userQuestion);
+
+            // 3) System prompt corto y firme.
+            $systemPrompt = 'Eres un asistente experto en email marketing que responde preguntas sobre las campañas del usuario. Reglas estrictas: (1) Responde SIEMPRE en español, breve y directo. (2) Usa SOLO los datos provistos en el contexto. (3) Si los datos no alcanzan para responder, dilo claramente: "No tengo suficientes datos para responder eso". (4) Cuando des números, cítalos textualmente del contexto. (5) Formatea con viñetas si listas más de 2 elementos.';
+
+            // 4) Prompt final compacto.
+            $prompt = $context . "\nPREGUNTA DEL USUARIO: " . $userQuestion;
+
+            // 5) Streaming o respuesta completa.
+            if ($useStream) {
+                return $this->streamChatCompletion($systemPrompt, $prompt);
             }
 
-            $prompt = $contextData . $userQuestion;
+            // Fallback no-streaming (compatibilidad).
+            $aiResponse = $this->createChatCompletion($systemPrompt, $prompt, 400, 0.4);
 
-            \Log::info('AI Agent Request Prompt:', ['prompt' => $prompt]);
-
-            // Realizar la solicitud a la API compatible (LM Studio u otra)
-            $aiResponse = $this->createChatCompletion(
-                'Eres un asistente de marketing digital experto en analizar el rendimiento de campañas de email y proporcionar información útil, predicciones y recomendaciones basadas en los datos proporcionados. Siempre responde en español de manera clara y concisa. Si no tienes suficientes datos para una predicción específica, dilo claramente.',
-                $prompt,
-                700,
-                0.7
-            );
-
-            \Log::info('AI Agent Response (Raw):', ['response' => $aiResponse]);
-
-            // Verificar si hay error en la respuesta
             if (isset($aiResponse['error'])) {
-                \Log::error('AI Agent Error:', ['error' => $aiResponse['error']]);
                 return response()->json([
                     'success' => false,
                     'message' => $aiResponse['error']['message'],
-                    'error' => $aiResponse['error']
+                    'error'   => $aiResponse['error'],
                 ], 500);
             }
 
             if (isset($aiResponse['choices'][0]['message']['content'])) {
                 return response()->json([
-                    'success' => true,
-                    'response' => $aiResponse['choices'][0]['message']['content']
+                    'success'  => true,
+                    'response' => $aiResponse['choices'][0]['message']['content'],
+                    'intent'   => $intent,
                 ]);
-            } else {
-                \Log::error('AI Agent: No content in response.', ['raw_response' => $aiResponse]);
-                return response()->json([
-                    'success' => false,
-                    'message' => 'No se pudo obtener una respuesta válida de la IA. Por favor, verifica los logs para más detalles.',
-                    'error' => $aiResponse
-                ], 500);
             }
 
-        } catch (\Exception $e) {
-            \Log::error('AI Agent Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
             return response()->json([
                 'success' => false,
-                'message' => 'Error al comunicarse con la IA: ' . $e->getMessage()
+                'message' => 'No se pudo obtener una respuesta válida de la IA.',
+                'error'   => $aiResponse,
+            ], 500);
+
+        } catch (\Exception $e) {
+            \Log::error('Chatbot Exception:', ['message' => $e->getMessage(), 'trace' => $e->getTraceAsString()]);
+            return response()->json([
+                'success' => false,
+                'message' => 'Error al comunicarse con la IA: ' . $e->getMessage(),
             ], 500);
         }
+    }
+
+    /**
+     * Clasifica la pregunta del usuario en uno de varios "intents" mediante
+     * coincidencia de keywords. Es rapidísimo (no llama al LLM para clasificar).
+     *
+     * Intents posibles:
+     *   - 'schedule'         → mejor hora/día para enviar
+     *   - 'campaign_metric'  → métrica concreta de una campaña ("cuántos abrieron la campaña 3")
+     *   - 'overview'         → resumen general / lista de campañas
+     *   - 'recommendation'   → consejos para mejorar
+     *   - 'general'          → cualquier otra pregunta
+     */
+    private function detectQuestionIntent(string $question): string
+    {
+        $q = mb_strtolower($question);
+
+        // Helper para chequear si alguna keyword aparece
+        $contains = function (array $keywords) use ($q) {
+            foreach ($keywords as $kw) {
+                if (mb_strpos($q, $kw) !== false) return true;
+            }
+            return false;
+        };
+
+        // 0) PREGUNTAS EDUCATIVAS / DEFINICIONES → general
+        // Si pregunta "qué es X", "explícame X", "qué significa X" tiene prioridad
+        // sobre las otras detecciones (no queremos inyectar métricas si solo
+        // quiere una definición).
+        if ($contains([
+            'que es', 'qué es', 'qué significa', 'que significa',
+            'explicame', 'explícame', 'explica ', 'definicion', 'definición',
+            'qué quiere decir', 'que quiere decir',
+        ])) {
+            return 'general';
+        }
+
+        // 1) RECOMENDACIONES → tiene prioridad sobre "métrica" porque "mejorar
+        // mi tasa de apertura" es claramente una petición de consejo, no un
+        // dato puntual.
+        if ($contains([
+            'recomienda', 'recomendacion', 'recomendación',
+            'consejo', 'mejorar', 'que hago', 'qué hago',
+            'tip', 'sugiere', 'sugerencia', 'cómo aumentar', 'como aumentar',
+            'cómo mejorar', 'como mejorar', 'cómo subir', 'como subir',
+        ])) {
+            return 'recommendation';
+        }
+
+        // 2) HORARIOS - "cuándo enviar", "mejor hora", "qué día", etc.
+        $hasCuando = $contains(['cuando', 'cuándo']);
+        $hasEnviar = $contains(['enviar', 'envio', 'envío', 'mandar', 'campaña', 'campana', 'correo', 'email']);
+        if ($hasCuando && $hasEnviar) {
+            return 'schedule';
+        }
+        if ($contains([
+            'hora', 'horario', 'mejor momento', 'mejor dia', 'mejor día',
+            'que dia', 'qué día', 'qué hora', 'que hora',
+            'mañana', 'tarde', 'noche', 'madrugada',
+            'lunes', 'martes', 'miercoles', 'miércoles',
+            'jueves', 'viernes', 'sabado', 'sábado', 'domingo',
+            'momento ideal', 'dia ideal', 'día ideal',
+        ])) {
+            return 'schedule';
+        }
+
+        // 3) MÉTRICA DE CAMPAÑA ESPECÍFICA
+        $isCampaignSpecific = (
+            preg_match('/campa[nñ]a\s*[#"\']?\s*(\d+|esta|esa|aquella|actual|reciente|ultima|última|primera|nueva)/iu', $q)
+            || preg_match('/\b(esta|esa|aquella|actual|reciente|ultima|última|primera|nueva)\s+campa[nñ]a/iu', $q)
+            || $contains([
+                'cuantos correos', 'cuántos correos',
+                'cuantos abrieron', 'cuántos abrieron',
+                'cuantos leyeron', 'cuántos leyeron',
+                'cuantos clickearon', 'cuántos clickearon',
+                'cuantas personas', 'cuántas personas',
+                'numero de aperturas', 'número de aperturas',
+                'tasa de apertura', 'tasa de clic',
+                'estadisticas de', 'estadísticas de',
+                'datos de', 'metricas de', 'métricas de',
+                'mejor desempeño', 'mejor desempeno', 'peor desempeño', 'peor desempeno',
+                'mejor campaña', 'mejor campana', 'peor campaña', 'peor campana',
+            ])
+        );
+        if ($isCampaignSpecific) {
+            return 'campaign_metric';
+        }
+
+        // 4) OVERVIEW / LISTA
+        if ($contains([
+            'todas las campañas', 'todas las campanas',
+            'lista de campañas', 'lista de campanas',
+            'resumen', 'cuantas campañas', 'cuántas campañas',
+            'cuantas campanas', 'cuántas campanas',
+        ])) {
+            return 'overview';
+        }
+
+        return 'general';
+    }
+
+    /**
+     * Construye el bloque de contexto que se le pasa al LLM según el intent.
+     * La idea es enviar el MÍNIMO de datos necesarios para que la respuesta
+     * sea rápida y precisa.
+     */
+    private function buildContextForIntent(string $intent, string $question): string
+    {
+        switch ($intent) {
+            case 'schedule':
+                return $this->buildScheduleContext();
+
+            case 'campaign_metric':
+                return $this->buildCampaignMetricContext($question);
+
+            case 'overview':
+                return $this->buildOverviewContext();
+
+            case 'recommendation':
+                return $this->buildOverviewContext() . "\n(Usa estos datos como base para tus recomendaciones.)\n";
+
+            case 'general':
+            default:
+                return $this->buildOverviewContext();
+        }
+    }
+
+    /**
+     * Contexto compacto con métricas resumidas de TODAS las campañas.
+     */
+    private function buildOverviewContext(): string
+    {
+        $resp = $this->getCampaignPerformance();
+        $data = json_decode($resp->getContent(), true)['data'] ?? [];
+
+        if (empty($data)) {
+            return "CONTEXTO: No hay campañas registradas todavía.\n";
+        }
+
+        $ctx = "CONTEXTO - Resumen de campañas:\n";
+        $ctx .= "Total de campañas: " . count($data) . "\n\n";
+        foreach ($data as $c) {
+            $ctx .= "• Campaña #{$c['campaign_id']} \"{$c['subject']}\": "
+                  . "enviados={$c['total_sent']}, abiertos={$c['total_opened']}, "
+                  . "clics={$c['total_clicked']}, "
+                  . "tasa_apertura={$c['open_rate']}%, "
+                  . "CTR={$c['click_rate']}%\n";
+        }
+        return $ctx . "\n";
+    }
+
+    /**
+     * Contexto enfocado en horarios y días óptimos (reutiliza
+     * computeOpenStatsByTime que ya teníamos).
+     */
+    private function buildScheduleContext(): string
+    {
+        $stats = $this->computeOpenStatsByTime();
+
+        if ($stats['total_opens'] < 5) {
+            return "CONTEXTO: Solo hay {$stats['total_opens']} aperturas registradas, datos insuficientes para recomendar horarios con confianza.\n";
+        }
+
+        $ctx = "CONTEXTO - Patrón de aperturas (zona horaria: {$stats['timezone']}):\n";
+        $ctx .= "Total aperturas analizadas: {$stats['total_opens']}\n\n";
+
+        $ctx .= "Top 3 horas con más aperturas:\n";
+        foreach ($stats['top_hours'] as $h) {
+            $ctx .= "  - {$h['hour']}: {$h['opens']} aperturas\n";
+        }
+
+        $ctx .= "\nTop 3 días con más aperturas:\n";
+        foreach ($stats['top_days'] as $d) {
+            $ctx .= "  - {$d['day']}: {$d['opens']} aperturas\n";
+        }
+
+        $ctx .= "\nMejores combinaciones día+hora:\n";
+        foreach ($stats['top_slots'] as $s) {
+            $ctx .= "  - {$s['day']} a las {$s['hour']}: {$s['opens']} aperturas\n";
+        }
+
+        return $ctx . "\n";
+    }
+
+    /**
+     * Contexto para preguntas sobre una campaña específica. Intenta extraer
+     * el ID de la pregunta; si no, devuelve todas las campañas y deja que
+     * el LLM identifique cuál.
+     */
+    private function buildCampaignMetricContext(string $question): string
+    {
+        $resp = $this->getCampaignPerformance();
+        $data = json_decode($resp->getContent(), true)['data'] ?? [];
+
+        if (empty($data)) {
+            return "CONTEXTO: No hay campañas registradas.\n";
+        }
+
+        // Intentar extraer ID de la pregunta: "campaña 3", "campaña #5", etc.
+        $matchedId = null;
+        if (preg_match('/campa[nñ]a\s*#?\s*(\d+)/iu', $question, $m)) {
+            $matchedId = (int) $m[1];
+        }
+
+        // O detectar "la última" / "la actual" / "la reciente"
+        $isLatest = preg_match('/\b(ultima|última|actual|reciente|nueva)\b/iu', $question);
+
+        if ($matchedId) {
+            $campaign = collect($data)->firstWhere('campaign_id', $matchedId);
+            if ($campaign) {
+                return $this->renderCampaignDetail($campaign);
+            }
+            return "CONTEXTO: No existe una campaña con ID {$matchedId}. Campañas existentes: "
+                 . implode(', ', array_column($data, 'campaign_id')) . ".\n";
+        }
+
+        if ($isLatest) {
+            // La última (la primera del array si vienen ordenadas desc, sino la de mayor id)
+            $latest = collect($data)->sortByDesc('campaign_id')->first();
+            return "CONTEXTO - Datos de la campaña más reciente:\n" . $this->renderCampaignDetail($latest);
+        }
+
+        // Sin ID claro: incluir todas las campañas con detalle moderado.
+        $ctx = "CONTEXTO - Métricas detalladas de todas las campañas:\n";
+        foreach ($data as $c) {
+            $ctx .= $this->renderCampaignDetail($c) . "\n";
+        }
+        return $ctx;
+    }
+
+    private function renderCampaignDetail(array $c): string
+    {
+        return "• Campaña #{$c['campaign_id']} \"{$c['subject']}\"\n"
+             . "    Enviada: {$c['created_at']}\n"
+             . "    Correos enviados: {$c['total_sent']}\n"
+             . "    Correos abiertos (leídos): {$c['total_opened']}\n"
+             . "    Clics recibidos: {$c['total_clicked']}\n"
+             . "    Tasa de apertura: {$c['open_rate']}%\n"
+             . "    Tasa de clic (CTR): {$c['click_rate']}%\n"
+             . "    Tasa clic-a-apertura: " . ($c['click_to_open_rate'] ?? 0) . "%\n";
+    }
+
+    /**
+     * Hace streaming Server-Sent Events del LLM hacia el cliente.
+     *
+     * Conecta a LM Studio con stream:true, lee cada chunk SSE, extrae el
+     * texto del delta y lo reenvía al navegador en formato simple para
+     * que el frontend lo pueda renderizar progresivamente.
+     */
+    private function streamChatCompletion(string $systemPrompt, string $userPrompt)
+    {
+        $baseUrl = rtrim(env('LLM_BASE_URL', 'http://localhost:1234/v1'), '/');
+        $apiKey  = env('LLM_API_KEY', 'lm-studio');
+        $model   = env('LLM_MODEL', 'deepseek-r1-0528-qwen3-8b');
+        $endpoint = $baseUrl . '/chat/completions';
+
+        $payload = [
+            'model'       => $model,
+            'messages'    => [
+                ['role' => 'system', 'content' => $systemPrompt],
+                ['role' => 'user',   'content' => $userPrompt],
+            ],
+            'max_tokens'  => 400,
+            'temperature' => 0.4,
+            'stream'      => true,
+        ];
+
+        return response()->stream(function () use ($endpoint, $payload, $apiKey) {
+            // Desactivar buffering de salida para que cada chunk se envíe al instante.
+            @ini_set('output_buffering', 'off');
+            @ini_set('zlib.output_compression', false);
+            while (ob_get_level() > 0) { @ob_end_flush(); }
+
+            $ch = curl_init($endpoint);
+            curl_setopt_array($ch, [
+                CURLOPT_POST           => true,
+                CURLOPT_HTTPHEADER     => [
+                    'Authorization: Bearer ' . $apiKey,
+                    'Content-Type: application/json',
+                    'Accept: text/event-stream',
+                ],
+                CURLOPT_POSTFIELDS     => json_encode($payload),
+                CURLOPT_TIMEOUT        => 180,
+                CURLOPT_RETURNTRANSFER => false,
+                // Callback: se ejecuta cada vez que cURL recibe un chunk de LM Studio.
+                CURLOPT_WRITEFUNCTION  => function ($ch, $data) {
+                    // LM Studio devuelve líneas tipo: "data: {...json...}\n\n"
+                    // Puede llegar más de una en un solo chunk.
+                    $lines = preg_split('/\r?\n/', $data);
+                    foreach ($lines as $line) {
+                        $line = trim($line);
+                        if ($line === '' || strpos($line, 'data:') !== 0) continue;
+
+                        $payload = trim(substr($line, 5));
+                        if ($payload === '[DONE]') {
+                            echo "event: done\ndata: [DONE]\n\n";
+                            @flush();
+                            continue;
+                        }
+
+                        $json = json_decode($payload, true);
+                        if (!is_array($json)) continue;
+
+                        // Extraer el delta de contenido (puede no venir en chunks de control).
+                        $delta = $json['choices'][0]['delta']['content'] ?? '';
+                        if ($delta !== '') {
+                            // Reenviar como SSE simple para el cliente: data: {"t":"texto"}
+                            echo 'data: ' . json_encode(['t' => $delta], JSON_UNESCAPED_UNICODE) . "\n\n";
+                            @flush();
+                        }
+                    }
+                    return strlen($data);
+                },
+            ]);
+            curl_exec($ch);
+
+            if (curl_errno($ch)) {
+                $err = curl_error($ch);
+                \Log::error('Streaming cURL error', ['error' => $err]);
+                echo 'data: ' . json_encode(['error' => $err], JSON_UNESCAPED_UNICODE) . "\n\n";
+                @flush();
+            }
+            curl_close($ch);
+        }, 200, [
+            'Content-Type'      => 'text/event-stream',
+            'Cache-Control'     => 'no-cache, no-store, must-revalidate',
+            'Connection'        => 'keep-alive',
+            'X-Accel-Buffering' => 'no', // Para Nginx; ignorado por Apache pero no hace daño
+        ]);
     }
 
     public function getEmailImageRecommendations(Request $request)
